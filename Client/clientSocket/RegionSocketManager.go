@@ -11,7 +11,7 @@ var regionIP string = "localhost"
 var regionPort int = 12345
 
 // initial connection to region server and send message
-func connectToRegionIP(regionIP string, sql string)bool{
+func ConnectToRegionIP(regionIP string, sql string)bool{
     address := net.TCPAddr{
         IP:   net.ParseIP(regionIP), // 把字符串IP地址转换为net.IP类型
         Port: regionPort,
@@ -31,7 +31,7 @@ func connectToRegionIP(regionIP string, sql string)bool{
 	return true
 }
 // initial connection to region server and send message
-func connectToRegionPort(regionPort int, sql string)bool{
+func ConnectToRegionPort(regionPort int, sql string)bool{
     address := net.TCPAddr{
         IP:   net.ParseIP(regionIP), // 把字符串IP地址转换为net.IP类型
         Port: regionPort,
@@ -48,6 +48,7 @@ func connectToRegionPort(regionPort int, sql string)bool{
 		return false
 	}
 	fmt.Printf("send %s to %s\n", sql, conn.RemoteAddr())
+	conn.Close()
 	return true
 }
 
@@ -83,6 +84,6 @@ func main(){
 	go KeepListening("127.0.0.1",8004)
 	for true  {
         fmt.Scanln(&sql)
-		connectToRegionPort(8000,sql)
+		ConnectToRegionPort(8000,sql)
     }
 }
