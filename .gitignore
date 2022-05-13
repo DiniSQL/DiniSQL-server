@@ -22,3 +22,4 @@ Build/*
 # Others
 .vscode/*
 .DS_Store
+.idea/
