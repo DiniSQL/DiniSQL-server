@@ -1,12 +1,9 @@
 package main
 
 import (
-	"DiniSQL/MiniSQL/src/API"
-	"DiniSQL/MiniSQL/src/BufferManager"
-	"DiniSQL/MiniSQL/src/CatalogManager"
+	// "DiniSQL/MiniSQL/src/API"
 	"DiniSQL/MiniSQL/src/Interpreter/parser"
 	"DiniSQL/MiniSQL/src/Interpreter/types"
-	"DiniSQL/MiniSQL/src/RecordManager"
 	"DiniSQL/MiniSQL/src/Utils/Error"
 	"bufio"
 	"fmt"
@@ -14,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
 	"github.com/peterh/liner"
 )
 
@@ -22,22 +18,6 @@ const historyCommmandFile = "~/.minisql_history"
 const firstPrompt = "minisql>"
 const secondPrompt = "      ->"
 
-//FlushALl 结束时做的所有工作
-func FlushALl() {
-	BufferManager.BlockFlushAll()                                             //缓存block
-	RecordManager.FlushFreeList()                                             //free list写回
-	CatalogManager.FlushDatabaseMeta(CatalogManager.UsingDatabase.DatabaseId) //刷新记录长度和余量
-}
-
-func InitDB() error {
-	err := CatalogManager.LoadDbMeta()
-	if err != nil {
-		return err
-	}
-	BufferManager.InitBuffer()
-
-	return nil
-}
 func expandPath(path string) (string, error) {
 	if strings.HasPrefix(path, "~/") {
 		parts := strings.SplitN(path, "/", 2)
@@ -90,13 +70,11 @@ func runShell(r chan<- error) {
 		//fmt.Println(s.Text())
 		ll.AppendHistory(s.Text())
 	}
-	InitDB()
 
 	StatementChannel := make(chan types.DStatements, 500)  //用于传输操作指令通道
 	FinishChannel := make(chan Error.Error, 500)           //用于api执行完成反馈通道
-	FlushChannel := make(chan struct{})                    //用于每条指令结束后协程flush
-	go API.HandleOneParse(StatementChannel, FinishChannel) //begin the runtime for exec
-	go BufferManager.BeginBlockFlush(FlushChannel)
+	// FlushChannel := make(chan struct{})                    //用于每条指令结束后协程flush
+	go HandleOneParse(StatementChannel, FinishChannel) //begin the runtime for exec
 	var beginSQLParse = false
 	var sqlText = make([]byte, 0, 100)
 	for { //each sql
@@ -124,7 +102,6 @@ func runShell(r chan<- error) {
 					for _ = range FinishChannel {
 
 					}
-					FlushALl()
 					r <- err
 					return
 				}
@@ -147,7 +124,7 @@ func runShell(r chan<- error) {
 		<-FinishChannel //等待指令执行完成
 		durationTime := time.Since(beginTime)
 		fmt.Println("Finish operation at: ", durationTime)
-		FlushChannel <- struct{}{} //开始刷新cache
+		// FlushChannel <- struct{}{} //开始刷新cache
 	}
 }
 func main() {
