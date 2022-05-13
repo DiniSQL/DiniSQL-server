@@ -1,26 +1,13 @@
 package Region
 
-import (
-	"DiniSQL/MiniSQL/src/Interpreter/types"
-)
-
 //go:generate msgp
 
 type PacketHead struct {
-	packetType   PacketType
-	detailedType types.OperationType
-}
-
-type Payload struct {
-	content []byte
+	P_Type  int
+	Op_Type int
 }
 
 type Packet struct {
-	head    PacketHead
-	payload Payload
-}
-
-type HeartBeat2etcd struct {
-	serverID int
-	regions  []simpleRegion
+	Head    PacketHead
+	Payload []byte
 }

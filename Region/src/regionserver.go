@@ -26,14 +26,10 @@ func InitRegionServer() {
 func (server *RegionServer) heartBeat(conn net.Conn) {
 	for {
 		time.Sleep(5 * time.Second)
-		regions := make([]simpleRegion, len(server.regions))
-		for i := 1; i < len(server.regions); i++ {
-			regions[i] = server.regions[i].simplify()
-		}
 		str := fmt.Sprintf("ServerID:%d", server.serverID)
 		//h := HeartBeat2etcd{serverID: server.serverID, regions: regions}
-		p := Packet{head: PacketHead{packetType: KeepAlive, detailedType: -1},
-			payload: Payload{content: []byte(str)}}
+		p := Packet{Head: PacketHead{P_Type: KeepAlive, Op_Type: -1},
+			Payload: []byte(str)}
 		var replyBuf = make([]byte, p.Msgsize())
 		p.MarshalMsg(replyBuf)
 		conn.Write(replyBuf)
@@ -75,9 +71,9 @@ func (server *RegionServer) serve(conn net.Conn) {
 			break
 		} else {
 			p.UnmarshalMsg(buf)
-			if p.head.packetType == SQLOperation {
-				var statement = byteSliceToString(p.payload.content)
-				switch p.head.detailedType {
+			if p.Head.P_Type == SQLOperation {
+				var statement = byteSliceToString(p.Payload)
+				switch p.Head.Op_Type {
 				case types.Select:
 					fmt.Println(statement)
 				case types.CreateDatabase:
@@ -94,7 +90,8 @@ func (server *RegionServer) serve(conn net.Conn) {
 					fmt.Println(statement)
 				}
 			}
-			replyPacket := Packet{head: PacketHead{packetType: Result, detailedType: -1}, payload: Payload{content: []byte{1, 1, 1}}}
+			replyPacket := Packet{Head: PacketHead{P_Type: Result, Op_Type: -1},
+				Payload: []byte{1, 1, 1}}
 			var replyBuf = make([]byte, replyPacket.Msgsize())
 			replyPacket.MarshalMsg(replyBuf)
 			conn.Write(replyBuf)
