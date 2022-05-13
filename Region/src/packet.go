@@ -19,3 +19,8 @@ type Packet struct {
 	head    PacketHead
 	payload Payload
 }
+
+type HeartBeat2etcd struct {
+	serverID int
+	regions  []simpleRegion
+}

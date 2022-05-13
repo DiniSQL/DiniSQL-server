@@ -8,6 +8,7 @@ import (
 	"DiniSQL/MiniSQL/src/Interpreter/types"
 	"DiniSQL/MiniSQL/src/RecordManager"
 	"DiniSQL/MiniSQL/src/Utils/Error"
+	Region "DiniSQL/Region/src"
 	"bufio"
 	"fmt"
 	"os"
@@ -153,6 +154,7 @@ func runShell(r chan<- error) {
 
 func main() {
 	//errChan 用于接收shell返回的err
+	Region.InitRegionServer()
 	errChan := make(chan error)
 	go runShell(errChan) //开启shell协程
 	err := <-errChan
