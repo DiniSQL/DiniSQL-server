@@ -1,8 +1,11 @@
 package Region
 
 import (
+	"DiniSQL/MiniSQL/src/Interpreter/types"
 	"fmt"
 	"net"
+	"time"
+	"unsafe"
 )
 
 var regionServer *RegionServer
@@ -13,10 +16,24 @@ type RegionServer struct {
 	visitCount int
 }
 
-func initRegionServer() {
+func InitRegionServer() {
 	regionServer = new(RegionServer)
 	regionServer.visitCount = 0
+
 	listenFromClient(regionServer)
+}
+
+func (server *RegionServer) heartBeat(conn net.Conn) {
+	for {
+		time.Sleep(5 * time.Second)
+		str := fmt.Sprintf("ServerID:%d", server.serverID)
+		//h := HeartBeat2etcd{serverID: server.serverID, regions: regions}
+		p := Packet{Head: PacketHead{P_Type: KeepAlive, Op_Type: -1},
+			Payload: []byte(str)}
+		var replyBuf = make([]byte, p.Msgsize())
+		p.MarshalMsg(replyBuf)
+		conn.Write(replyBuf)
+	}
 }
 
 func listenFromClient(server *RegionServer) {
@@ -32,15 +49,52 @@ func listenFromClient(server *RegionServer) {
 			fmt.Println("Accept failed!")
 			continue
 		}
-		go server.serveClient(conn)
+		go server.serve(conn)
 	}
 }
 
-func (server *RegionServer) serveClient(conn net.Conn) {
+func byteSliceToString(bytes []byte) string {
+
+	return *(*string)(unsafe.Pointer(&bytes))
+
+}
+
+func (server *RegionServer) serve(conn net.Conn) {
 	defer conn.Close()
 	server.visitCount++
-	var buf = make([]byte, 1024)
+	p := Packet{}
 	for {
+		var buf = make([]byte, 1024)
 		conn.Read(buf)
+		var content = byteSliceToString(buf)
+		if content == "end" {
+			break
+		} else {
+			p.UnmarshalMsg(buf)
+			if p.Head.P_Type == SQLOperation {
+				var statement = byteSliceToString(p.Payload)
+				switch p.Head.Op_Type {
+				case types.Select:
+					fmt.Println(statement)
+				case types.CreateDatabase:
+					fmt.Println(statement)
+				case types.DropDatabase:
+					fmt.Println(statement)
+				case types.CreateIndex:
+					fmt.Println(statement)
+				case types.DropIndex:
+					fmt.Println(statement)
+				case types.Insert:
+					fmt.Println(statement)
+				default:
+					fmt.Println(statement)
+				}
+			}
+			replyPacket := Packet{Head: PacketHead{P_Type: Result, Op_Type: -1},
+				Payload: []byte{1, 1, 1}}
+			var replyBuf = make([]byte, replyPacket.Msgsize())
+			replyPacket.MarshalMsg(replyBuf)
+			conn.Write(replyBuf)
+		}
 	}
 }

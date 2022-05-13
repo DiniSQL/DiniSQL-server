@@ -16,8 +16,10 @@
 
 Build/*
 
-# Others
-.vscode/*
-
 # DB files
 /data
+
+# Others
+.vscode/*
+.DS_Store
+.idea/

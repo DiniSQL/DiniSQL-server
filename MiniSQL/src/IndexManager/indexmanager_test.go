@@ -1,10 +1,10 @@
 package IndexManager
 
 import (
+	"DiniSQL/MiniSQL/src/BufferManager"
+	"DiniSQL/MiniSQL/src/Interpreter/value"
 	"fmt"
 	"math/rand"
-	"minisql/src/BufferManager"
-	"minisql/src/Interpreter/value"
 	"os"
 	"testing"
 	"time"

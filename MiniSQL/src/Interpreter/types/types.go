@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+//go:generate msgp
+
 // NOTE aliases to refer from parser.
 const (
 	True  = true
@@ -60,16 +62,6 @@ const (
 type DStatements interface {
 	GetOperationType() OperationType
 }
-
-// DDStatements has parsed statements.
-//type DDStatements struct {
-//	CreateDatabases []CreateDatabaseStatement
-//	CreateTables    []CreateTableStatement
-//	CreateIndexes    []CreateIndexStatement
-//	DropDatabses    []DropDatabaseStatement
-//	DropTables      []DropTableStatement
-//	DropIndexes     []DropIndexStatement
-//}
 
 // Column is a table column.
 type Column struct {

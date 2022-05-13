@@ -8,6 +8,7 @@ import (
 	"DiniSQL/MiniSQL/src/Interpreter/types"
 	"DiniSQL/MiniSQL/src/RecordManager"
 	"DiniSQL/MiniSQL/src/Utils/Error"
+	Region "DiniSQL/Region/src"
 	"bufio"
 	"fmt"
 	"os"
@@ -18,9 +19,7 @@ import (
 	"github.com/peterh/liner"
 )
 
-const historyCommmandFile = "~/.minisql_history"
-const firstPrompt = "minisql>"
-const secondPrompt = "      ->"
+const historyCommmandFile = "~/.DiniSQL_history"
 
 //FlushALl 结束时做的所有工作
 func FlushALl() {
@@ -38,6 +37,7 @@ func InitDB() error {
 
 	return nil
 }
+
 func expandPath(path string) (string, error) {
 	if strings.HasPrefix(path, "~/") {
 		parts := strings.SplitN(path, "/", 2)
@@ -49,6 +49,7 @@ func expandPath(path string) (string, error) {
 	}
 	return path, nil
 }
+
 func loadHistoryCommand() (*os.File, error) {
 	var file *os.File
 	path, err := expandPath(historyCommmandFile)
@@ -68,18 +69,18 @@ func loadHistoryCommand() (*os.File, error) {
 		}
 	}
 	return file, err
-
 }
+
 func runShell(r chan<- error) {
-	ll := liner.NewLiner()
-	defer ll.Close()
-	ll.SetCtrlCAborts(true)
+	line := liner.NewLiner()
+	defer line.Close()
+	line.SetCtrlCAborts(true)
 	file, err := loadHistoryCommand()
 	if err != nil {
 		panic(err)
 	}
 	defer func() {
-		_, err := ll.WriteHistory(file)
+		_, err := line.WriteHistory(file)
 		if err != nil {
 			panic(err)
 		}
@@ -88,7 +89,7 @@ func runShell(r chan<- error) {
 	s := bufio.NewScanner(file)
 	for s.Scan() {
 		//fmt.Println(s.Text())
-		ll.AppendHistory(s.Text())
+		line.AppendHistory(s.Text())
 	}
 	InitDB()
 
@@ -107,9 +108,9 @@ func runShell(r chan<- error) {
 		var err error
 		for { //each line
 			if beginSQLParse {
-				input, err = ll.Prompt(secondPrompt)
+				input, err = line.Prompt("      -> ")
 			} else {
-				input, err = ll.Prompt(firstPrompt)
+				input, err = line.Prompt("DiniSQL> ")
 			}
 			if err != nil {
 				if err == liner.ErrPromptAborted {
@@ -118,7 +119,7 @@ func runShell(r chan<- error) {
 			}
 			trimInput := strings.TrimSpace(input) //get the input without front and backend space
 			if len(trimInput) != 0 {
-				ll.AppendHistory(input)
+				line.AppendHistory(input)
 				if !beginSQLParse && (trimInput == "quit" || strings.HasPrefix(trimInput, "quit;")) {
 					close(StatementChannel)
 					for _ = range FinishChannel {
@@ -150,11 +151,12 @@ func runShell(r chan<- error) {
 		FlushChannel <- struct{}{} //开始刷新cache
 	}
 }
+
 func main() {
 	//errChan 用于接收shell返回的err
+	Region.InitRegionServer()
 	errChan := make(chan error)
 	go runShell(errChan) //开启shell协程
-	// go BackEnd.Regist()
 	err := <-errChan
 	fmt.Println("bye")
 	if err != nil {
