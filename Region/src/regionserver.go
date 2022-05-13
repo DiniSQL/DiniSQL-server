@@ -40,7 +40,9 @@ func (server *RegionServer) serveClient(conn net.Conn) {
 	defer conn.Close()
 	server.visitCount++
 	var buf = make([]byte, 1024)
+	p := Packet{}
 	for {
 		conn.Read(buf)
+		p.UnmarshalMsg(buf)
 	}
 }

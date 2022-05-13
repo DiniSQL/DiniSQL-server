@@ -6,22 +6,16 @@ import (
 
 //go:generate msgp
 
-type PacketType = int
-
-const (
-	KeepAlive PacketType = iota
-	Ask
-	Answer
-	SQLOperation
-	Result
-)
-
 type PacketHead struct {
 	packetType   PacketType
 	detailedType types.OperationType
-	payload      Payload
 }
 
 type Payload struct {
 	content []byte
+}
+
+type Packet struct {
+	head    PacketHead
+	payload Payload
 }
