@@ -37,7 +37,7 @@ func (server *RegionServer) heartBeat(conn net.Conn) {
 }
 
 func listenFromClient(server *RegionServer) {
-	listen, err := net.Listen("tcp", "")
+	listen, err := net.Listen("tcp", "172.20.10.3")
 	if err != nil {
 		fmt.Println("Failed to listen to client!")
 		return

@@ -4,14 +4,13 @@ import (
     "fmt"
     "log"
     "net"
-
+	Region "DiniSQL/Region/src"
 )
 
-var regionIP string = "localhost"
-var regionPort int = 12345
+var ch = make(chan []byte, 5)
 
 // initial connection to region server and send message
-func ConnectToRegionIP(regionIP string, sql string)bool{
+func ConnectToRegion(regionIP string,regionPort int, packet Region.Packet)bool{
     address := net.TCPAddr{
         IP:   net.ParseIP(regionIP), // 把字符串IP地址转换为net.IP类型
         Port: regionPort,
@@ -21,33 +20,25 @@ func ConnectToRegionIP(regionIP string, sql string)bool{
         log.Fatal(err) // Println + os.Exit(1)
 		return false
     }
-	_, err1 := conn.Write([]byte(sql))
-	if err1 != nil {
-		log.Println(err)
-		conn.Close()
-		return false
-	}
-	fmt.Printf("send %s to %s\n", sql, conn.RemoteAddr())
-	return true
-}
-// initial connection to region server and send message
-func ConnectToRegionPort(regionPort int, sql string)bool{
-    address := net.TCPAddr{
-        IP:   net.ParseIP(regionIP), // 把字符串IP地址转换为net.IP类型
-        Port: regionPort,
-    }
-	conn, err := net.DialTCP("tcp4", nil, &address)
-    if err != nil {
+	var packetBuf = make([]byte, packet.Msgsize())
+	packetBuf,err = packet.MarshalMsg(packetBuf)
+	fmt.Println(packetBuf)
+	if err != nil {
         log.Fatal(err) // Println + os.Exit(1)
 		return false
     }
-	_, err1 := conn.Write([]byte(sql))
+	// packetBuf[0] = 3
+	// packetBuf[1] = 3
+	// packetBuf[2] = 3
+
+	_, err1 := conn.Write(packetBuf)
+	fmt.Println(packet)
 	if err1 != nil {
 		log.Println(err)
 		conn.Close()
 		return false
 	}
-	fmt.Printf("send %s to %s\n", sql, conn.RemoteAddr())
+	fmt.Printf("send %d to %s\n", packet.Head.P_Type, conn.RemoteAddr())
 	conn.Close()
 	return true
 }
@@ -71,6 +62,7 @@ func KeepListening(ClientIP string, ClientPort int){
         fmt.Println("remote address:", conn.RemoteAddr())
         res := make([]byte,1024)
         _, err1 := conn.Read(res)
+		ch <- res
 		if err1 != nil {
             log.Println(err)
             conn.Close()
@@ -84,6 +76,8 @@ func main(){
 	go KeepListening("127.0.0.1",8004)
 	for true  {
         fmt.Scanln(&sql)
-		ConnectToRegionPort(8000,sql)
+		p := Region.Packet{Head: Region.PacketHead{P_Type: Region.KeepAlive, Op_Type: -1},
+			Payload: []byte(sql)}
+		ConnectToRegion("10.192.16.210",6100,p)
     }
 }
