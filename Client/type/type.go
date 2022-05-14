@@ -1,6 +1,7 @@
 package Type
 
 //go:generate msgp
+
 type OperationType = int
 
 const (

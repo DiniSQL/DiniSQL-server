@@ -4,13 +4,15 @@ import (
     "fmt"
     "log"
     "net"
-	Region "DiniSQL/Region/src"
+	"DiniSQL/Client/type"
+	"github.com/tinylib/msgp/msgp"
 )
 
 var ch = make(chan []byte, 5)
 
 // initial connection to region server and send message
-func ConnectToRegion(regionIP string,regionPort int, packet Region.Packet)bool{
+func ConnectToRegion(regionIP string,regionPort int, packet Type.Packet)bool{
+
     address := net.TCPAddr{
         IP:   net.ParseIP(regionIP), // 把字符串IP地址转换为net.IP类型
         Port: regionPort,
@@ -40,7 +42,9 @@ func ConnectToRegion(regionIP string,regionPort int, packet Region.Packet)bool{
 	}
 	fmt.Printf("send %d to %s\n", packet.Head.P_Type, conn.RemoteAddr())
 	conn.Close()
+
 	return true
+
 }
 
 // listen 
