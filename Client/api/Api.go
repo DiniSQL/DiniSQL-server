@@ -9,6 +9,7 @@ import (
 	// "errors"
 	"fmt"
 	"DiniSQL/Client/type"
+	"DiniSQL/Client/clientSocket"
 	// "os"
 	// "sync"
 )
@@ -36,6 +37,7 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Err
 			var sqlByte []byte = []byte(sql)
 			// fmt.Println("sql:"+sql)
 			Packet.Payload=sqlByte
+			Socket.ConnectToRegion("10.192.182.120",8004,Packet);
 			// err = CreateDatabaseAPI(statement.(types.CreateDatabaseStatement))
 			// if err.Status != true {
 			// 	fmt.Println(err.ErrorHint)
@@ -175,9 +177,8 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Err
 			// }
 		case types.Select:      //R或M
 			fmt.Println("Select")
-			statement2:=statement.(types.SelectStatement)
-			tableNames:=statement2.TableNames
-			for _,name
+			// statement2:=statement.(types.SelectStatement)
+			// tableNames:=statement2.TableNames
 			var Head Type.PacketHead
 			Head.P_Type=Type.Ask
 			Head.Op_Type=Type.Select

@@ -1,4 +1,4 @@
-package main
+package Socket
 
 import (
     "fmt"
@@ -71,13 +71,13 @@ func KeepListening(ClientIP string, ClientPort int){
     }
 }
 
-func main(){
-	var sql string
-	go KeepListening("127.0.0.1",8004)
-	for true  {
-        fmt.Scanln(&sql)
-		p := Region.Packet{Head: Region.PacketHead{P_Type: Region.KeepAlive, Op_Type: -1},
-			Payload: []byte(sql)}
-		ConnectToRegion("10.192.16.210",6100,p)
-    }
-}
+// func main(){
+// 	var sql string
+// 	go KeepListening("127.0.0.1",8004)
+// 	for true  {
+//         fmt.Scanln(&sql)
+// 		p := Region.Packet{Head: Region.PacketHead{P_Type: Region.KeepAlive, Op_Type: -1},
+// 			Payload: []byte(sql)}
+// 		ConnectToRegion("10.192.16.210",6100,p)
+//     }
+// }
