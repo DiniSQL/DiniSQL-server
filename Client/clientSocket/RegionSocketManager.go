@@ -5,7 +5,7 @@ import (
     "log"
     "net"
 	"DiniSQL/Client/type"
-	"github.com/tinylib/msgp/msgp"
+
 )
 
 var ch = make(chan []byte, 5)
@@ -80,7 +80,7 @@ func main(){
 	go KeepListening("127.0.0.1",8004)
 	for true  {
         fmt.Scanln(&sql)
-		p := Region.Packet{Head: Region.PacketHead{P_Type: Region.KeepAlive, Op_Type: -1},
+		p := Type.Packet{Head: Type.PacketHead{P_Type: Type.KeepAlive, Op_Type: -1},
 			Payload: []byte(sql)}
 		ConnectToRegion("10.192.16.210",6100,p)
     }

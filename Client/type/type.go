@@ -1,7 +1,5 @@
 package Type
 
-//go:generate msgp
-
 type OperationType = int
 
 const (
@@ -30,16 +28,6 @@ const (
 	UploadRegion                     // Master send to RegionServer, tell the RegionServer to upload a region to etcd
 	DownloadRegion                   //Master send to RegionServer, tell the RegionServer to download a region from etcd
 )
-
-type PacketHead struct {
-	P_Type  int
-	Op_Type int
-}
-
-type Packet struct {
-	Head    PacketHead
-	Payload []byte
-}
 
 // type Column struct {
 // 	Name      string

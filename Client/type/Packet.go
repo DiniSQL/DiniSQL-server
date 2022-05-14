@@ -1,8 +1,4 @@
-package Region
-
-// import (
-//     "fmt"
-// )
+package Type
 
 //go:generate msgp
 
