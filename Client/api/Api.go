@@ -8,6 +8,7 @@ import (
 	"DiniSQL/MiniSQL/src/Utils/Error"
 	// "errors"
 	"fmt"
+	"DiniSQL/Client/type"
 	// "os"
 	// "sync"
 )
@@ -19,13 +20,22 @@ import (
 //HandleOneParse 用来处理parse处理完的DStatement类型  dataChannel是接收Statement的通道,整个mysql运行过程中不会关闭，但是quit后就会关闭
 //stopChannel 用来发送同步信号，每次处理完一个后就发送一个信号用来同步两协程，主协程需要接收到stopChannel的发送后才能继续下一条指令，当dataChannel
 //关闭后，stopChannel才会关闭
-func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Error.Error) {
+func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Error.Error,sqlChannel <-chan string) {
 	var err Error.Error
 	for statement := range dataChannel {
-		//fmt.Println(statement)
+		var sql string
+		sql=<-sqlChannel
 		switch statement.GetOperationType() {
 		case types.CreateDatabase:
 			fmt.Println("CreateDatabase")
+			var Head Type.PacketHead
+			Head.P_Type=Type.Ask
+			Head.Op_Type=Type.CreateDatabase
+			var Packet Type.Packet
+			Packet.Head=Head
+			var sqlByte []byte = []byte(sql)
+			// fmt.Println("sql:"+sql)
+			Packet.Payload=sqlByte
 			// err = CreateDatabaseAPI(statement.(types.CreateDatabaseStatement))
 			// if err.Status != true {
 			// 	fmt.Println(err.ErrorHint)
@@ -34,7 +44,15 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Err
 			// }
 
 		case types.UseDatabase:
-			fmt.Println("UserDatabase")
+			fmt.Println("UseDatabase")
+			var Head Type.PacketHead
+			Head.P_Type=Type.Ask
+			Head.Op_Type=Type.UseDatabase
+			var Packet Type.Packet
+			Packet.Head=Head
+			var sqlByte []byte = []byte(sql)
+			// fmt.Println("sql:"+sql)
+			Packet.Payload=sqlByte
 			// err = UseDatabaseAPI(statement.(types.UseDatabaseStatement))
 			// if err.Status != true {
 			// 	fmt.Println(err.ErrorHint)
@@ -43,6 +61,13 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Err
 			// }
 		case types.CreateTable:  //M
 			fmt.Println("CreateTable")
+			var Head Type.PacketHead
+			Head.P_Type=Type.Ask
+			Head.Op_Type=Type.CreateTable
+			var Packet Type.Packet
+			Packet.Head=Head
+			var sqlByte []byte = []byte(sql)
+			Packet.Payload=sqlByte
 			// err = CreateTableAPI(statement.(types.CreateTableStatement))
 			// if err.Status != true {
 			// 	fmt.Println(err.ErrorHint)
@@ -52,6 +77,14 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Err
 
 		case types.CreateIndex:  //M
 			fmt.Println("CreateIndex")
+			var Head Type.PacketHead
+			Head.P_Type=Type.Ask
+			Head.Op_Type=Type.CreateIndex
+			var Packet Type.Packet
+			Packet.Head=Head
+			var sqlByte []byte = []byte(sql)
+			// fmt.Println("sql:"+sql)
+			Packet.Payload=sqlByte
 			// err = CreateIndexAPI(statement.(types.CreateIndexStatement))
 			// if err.Status != true {
 			// 	fmt.Println(err.ErrorHint)
@@ -60,6 +93,14 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Err
 			// }
 		case types.DropTable:    //M
 			fmt.Println("DropTable")
+			var Head Type.PacketHead
+			Head.P_Type=Type.Ask
+			Head.Op_Type=Type.DropTable
+			var Packet Type.Packet
+			Packet.Head=Head
+			var sqlByte []byte = []byte(sql)
+			// fmt.Println("sql:"+sql)
+			Packet.Payload=sqlByte
 			// err = DropTableAPI(statement.(types.DropTableStatement))
 			// if err.Status != true {
 			// 	fmt.Println(err.ErrorHint)
@@ -68,7 +109,15 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Err
 			// }
 
 		case types.DropIndex:    //M
-			fmt.Println("DropTable")
+			fmt.Println("DropIndex")
+			var Head Type.PacketHead
+			Head.P_Type=Type.Ask
+			Head.Op_Type=Type.DropIndex
+			var Packet Type.Packet
+			Packet.Head=Head
+			var sqlByte []byte = []byte(sql)
+			// fmt.Println("sql:"+sql)
+			Packet.Payload=sqlByte
 			// err = DropIndexAPI(statement.(types.DropIndexStatement))
 			// if err.Status != true {
 			// 	fmt.Println(err.ErrorHint)
@@ -78,6 +127,14 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Err
 
 		case types.Insert:       //M
 			fmt.Println("Insert")
+			var Head Type.PacketHead
+			Head.P_Type=Type.Ask
+			Head.Op_Type=Type.Insert
+			var Packet Type.Packet
+			Packet.Head=Head
+			var sqlByte []byte = []byte(sql)
+			// fmt.Println("sql:"+sql)
+			Packet.Payload=sqlByte
 			// err = InsertAPI(statement.(types.InsertStament))
 			// if err.Status != true {
 			// 	fmt.Println(err.ErrorHint)
@@ -86,6 +143,14 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Err
 			// }
 		case types.Update:       //M
 			fmt.Println("Update")
+			var Head Type.PacketHead
+			Head.P_Type=Type.Ask
+			Head.Op_Type=Type.Update
+			var Packet Type.Packet
+			Packet.Head=Head
+			var sqlByte []byte = []byte(sql)
+			// fmt.Println("sql:"+sql)
+			Packet.Payload=sqlByte
 			// err = UpdateAPI(statement.(types.UpdateStament))
 			// if err.Status != true {
 			// 	fmt.Println(err.ErrorHint)
@@ -94,14 +159,33 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Err
 			// }
 		case types.Delete:       //M
 			fmt.Println("Delete")
+			var Head Type.PacketHead
+			Head.P_Type=Type.Ask
+			Head.Op_Type=Type.Delete
+			var Packet Type.Packet
+			Packet.Head=Head
+			var sqlByte []byte = []byte(sql)
+			// fmt.Println("sql:"+sql)
+			Packet.Payload=sqlByte
 			// err = DeleteAPI(statement.(types.DeleteStatement))
 			// if err.Status != true {
 			// 	fmt.Println(err.ErrorHint)
 			// } else {
 			// 	fmt.Printf("delete success, %d rows are deleted.\n", err.Rows)
 			// }
-		case types.Select:      //R
+		case types.Select:      //R或M
 			fmt.Println("Select")
+			statement2:=statement.(types.SelectStatement)
+			tableNames:=statement2.TableNames
+			for _,name
+			var Head Type.PacketHead
+			Head.P_Type=Type.Ask
+			Head.Op_Type=Type.Select
+			var Packet Type.Packet
+			Packet.Head=Head
+			var sqlByte []byte = []byte(sql)
+			// fmt.Println("sql:"+sql)
+			Packet.Payload=sqlByte
 			// err = SelectAPI(statement.(types.SelectStatement))
 			// if err.Status != true {
 			// 	fmt.Println(err.ErrorHint)
