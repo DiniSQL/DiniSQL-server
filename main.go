@@ -7,8 +7,10 @@ import (
 	"DiniSQL/MiniSQL/src/Interpreter/parser"
 	"DiniSQL/MiniSQL/src/Interpreter/types"
 	"DiniSQL/MiniSQL/src/RecordManager"
+	"DiniSQL/Region"
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -151,13 +153,27 @@ func runShell(r chan<- error) {
 	}
 }
 
+// func main() {
+// 	//errChan 用于接收shell返回的err
+// 	errChan := make(chan error)
+// 	go runShell(errChan) //开启shell协程
+// 	err := <-errChan
+// 	fmt.Println("bye")
+// 	if err != nil {
+// 		fmt.Println(err)
+// 	}
+// }
+
 func main() {
-	//errChan 用于接收shell返回的err
-	errChan := make(chan error)
-	go runShell(errChan) //开启shell协程
-	err := <-errChan
-	fmt.Println("bye")
+	var endpoints = []string{"127.0.0.1:2379"}
+	ser, err := Region.NewServiceRegister(endpoints, "/web/node1", "localhost:8000", 5)
 	if err != nil {
-		fmt.Println(err)
+		log.Fatalln(err)
+	}
+	//监听续租相应chan
+	go ser.ListenLeaseRespChan()
+	select {
+	// case <-time.After(20 * time.Second):
+	// 	ser.Close()
 	}
 }
