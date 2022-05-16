@@ -7,8 +7,6 @@ import (
 	"DiniSQL/MiniSQL/src/Interpreter/parser"
 	"DiniSQL/MiniSQL/src/Interpreter/types"
 	"DiniSQL/MiniSQL/src/RecordManager"
-	"DiniSQL/MiniSQL/src/Utils/Error"
-	Region "DiniSQL/Region/src"
 	"bufio"
 	"fmt"
 	"os"
@@ -94,7 +92,7 @@ func runShell(r chan<- error) {
 	InitDB()
 
 	StatementChannel := make(chan types.DStatements, 500)  //用于传输操作指令通道
-	FinishChannel := make(chan Error.Error, 500)           //用于api执行完成反馈通道
+	FinishChannel := make(chan string, 500)                //用于api执行完成反馈通道
 	FlushChannel := make(chan struct{})                    //用于每条指令结束后协程flush
 	go API.HandleOneParse(StatementChannel, FinishChannel) //begin the runtime for exec
 	go BufferManager.BeginBlockFlush(FlushChannel)
@@ -145,7 +143,8 @@ func runShell(r chan<- error) {
 			fmt.Println(err)
 			continue
 		}
-		<-FinishChannel //等待指令执行完成
+		ret := <-FinishChannel //等待指令执行完成
+		fmt.Println(ret)
 		durationTime := time.Since(beginTime)
 		fmt.Println("Finish operation at: ", durationTime)
 		FlushChannel <- struct{}{} //开始刷新cache
@@ -154,7 +153,6 @@ func runShell(r chan<- error) {
 
 func main() {
 	//errChan 用于接收shell返回的err
-	Region.InitRegionServer()
 	errChan := make(chan error)
 	go runShell(errChan) //开启shell协程
 	err := <-errChan
