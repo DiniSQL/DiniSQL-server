@@ -31,7 +31,7 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- str
 				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
 				// fmt.Println("create datbase success.")
-				ret = fmt.Sprintf("create datbase success.\n")
+				ret = fmt.Sprintf("create datbase success.")
 			}
 
 		case types.UseDatabase:
@@ -41,7 +41,7 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- str
 				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
 				// fmt.Printf("now you are using database.\n")
-				ret = fmt.Sprintf("now you are using database.\n")
+				ret = fmt.Sprintf("now you are using database.")
 			}
 
 		case types.CreateTable:
@@ -51,7 +51,7 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- str
 				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
 				// fmt.Printf("create table succes.\n")
-				ret = fmt.Sprintf("create table succes.\n")
+				ret = fmt.Sprintf("create table succes.")
 			}
 
 		case types.CreateIndex:
@@ -61,7 +61,7 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- str
 				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
 				// fmt.Printf("create index succes.\n")
-				ret = fmt.Sprintf("create index succes.\n")
+				ret = fmt.Sprintf("create index succes.")
 			}
 
 		case types.DropTable:
@@ -71,7 +71,7 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- str
 				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
 				// fmt.Printf("drop table succes.\n")
-				ret = fmt.Sprintf("drop table succes.\n")
+				ret = fmt.Sprintf("drop table succes.")
 			}
 
 		case types.DropIndex:
@@ -81,7 +81,7 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- str
 				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
 				// fmt.Printf("drop index succes.\n")
-				ret = fmt.Sprintf("drop index succes.\n")
+				ret = fmt.Sprintf("drop index succes.")
 			}
 
 		case types.DropDatabase:
@@ -91,7 +91,7 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- str
 				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
 				// fmt.Printf("drop database succes.\n")
-				ret = fmt.Sprintf("drop database succes.\n")
+				ret = fmt.Sprintf("drop database succes.")
 			}
 
 		case types.Insert:
@@ -101,7 +101,7 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- str
 				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
 				// fmt.Printf("insert success, 1 row affected.\n")
-				ret = fmt.Sprintf("insert success, 1 row affected.\n")
+				ret = fmt.Sprintf("insert success, 1 row affected.")
 			}
 
 		case types.Update:
@@ -111,7 +111,7 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- str
 				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
 				// fmt.Printf("update success, %d rows are updated.\n", err.Rows)
-				ret = fmt.Sprintf("update success, %d rows are updated.\n", err.Rows)
+				ret = fmt.Sprintf("update success, %d rows are updated.", err.Rows)
 			}
 
 		case types.Delete:
@@ -121,7 +121,7 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- str
 				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
 				// fmt.Printf("delete success, %d rows are deleted.\n", err.Rows)
-				ret = fmt.Sprintf("delete success, %d rows are deleted.\n", err.Rows)
+				ret = fmt.Sprintf("delete success, %d rows are deleted.", err.Rows)
 			}
 
 		case types.Select:
@@ -130,7 +130,7 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- str
 				// fmt.Println(err.ErrorHint)
 				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
-				PrintTable(statement.(types.SelectStatement).TableNames[0], err.Data[err.Rows], err.Data[0:err.Rows]) //very dirty  but I have no other choose
+				ret = PrintTable(statement.(types.SelectStatement).TableNames[0], err.Data[err.Rows], err.Data[0:err.Rows]) //very dirty  but I have no other choose
 			}
 		case types.ExecFile:
 			err = ExecFileAPI(statement.(types.ExecFileStatement))

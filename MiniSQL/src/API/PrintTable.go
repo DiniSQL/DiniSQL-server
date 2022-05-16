@@ -9,7 +9,7 @@ import (
 )
 
 //PrintTable 接收表名，列名，各个记录，打印table
-func PrintTable(tableName string, columnName value.Row, records []value.Row) error {
+func PrintTable(tableName string, columnName value.Row, records []value.Row) string {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
 	totalHeader := make([]interface{}, 0, len(columnName.Values)+1)
@@ -33,6 +33,6 @@ func PrintTable(tableName string, columnName value.Row, records []value.Row) err
 	}
 	t.AppendRows(Rows)
 	t.AppendFooter(table.Row{"Total", len(records)})
-	t.Render()
-	return nil
+	ret := t.Render()
+	return ret
 }

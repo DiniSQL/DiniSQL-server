@@ -143,8 +143,8 @@ func runShell(r chan<- error) {
 			fmt.Println(err)
 			continue
 		}
-		ret := <-FinishChannel //等待指令执行完成
-		fmt.Println(ret)
+		result := <-FinishChannel //等待指令执行完成
+		fmt.Println(result)
 		durationTime := time.Since(beginTime)
 		fmt.Println("Finish operation at: ", durationTime)
 		FlushChannel <- struct{}{} //开始刷新cache
