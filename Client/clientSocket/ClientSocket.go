@@ -4,6 +4,7 @@ import (
     "fmt"
     "log"
     "net"
+	"strconv"
 	"DiniSQL/Client/type"
 	"io/ioutil"
 )
@@ -51,17 +52,14 @@ func ConnectToRegion(regionIP string,regionPort int, packet Type.Packet)(recPack
 // listen 
 // input : IP and Port of client
 func KeepListening(ClientIP string, ClientPort int)(receivedPacket Type.Packet){
-    address := net.TCPAddr{
-        IP:   net.ParseIP(ClientIP), 
-        Port: ClientPort,
-    }
-    listener, err := net.ListenTCP("tcp4", &address) 
+	fmt.Printf("listening in %s...\n",ClientIP+":"+strconv.Itoa(ClientPort))
+    listener, err := net.Listen("tcp", ":"+strconv.Itoa(ClientPort)) 
 	defer listener.Close()
     if err != nil {
         log.Fatal(err) // Println + os.Exit(1)
     }
 
-        conn, err := listener.AcceptTCP()
+        conn, err := listener.Accept()
         if err != nil {
             log.Fatal(err)
         }
@@ -93,7 +91,7 @@ func main(){
 		p := Type.Packet{Head:Type.PacketHead{P_Type: Type.KeepAlive, Op_Type: Type.CreateIndex},
 			Payload: []byte(sql)}
 
-		ConnectToRegion("127.0.0.1",8006,p)  //RegionIP + RegionPort
+		ConnectToRegion("172.20.10.10",9000,p)  //RegionIP + RegionPort
     }
 }
 //client 8005 send -> listen
