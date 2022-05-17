@@ -118,7 +118,6 @@ func (server *RegionServer) serve(conn net.Conn) {
 		}
 		opRes = <-FinishChannel
 		fmt.Println(opRes)
-	} else if p.Head.P_Type == End {
 	}
 	replyPacket := Packet{Head: PacketHead{P_Type: Result, Op_Type: -1},
 		Payload: []byte(opRes)}
