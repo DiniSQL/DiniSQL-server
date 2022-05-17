@@ -9,5 +9,5 @@ const (
 	SQLOperation                     // Client send to RegionServer to execute a SQL operation
 	Result                           // RegionServer send to Client, the result of the SQL operation
 	UploadRegion                     // Master send to RegionServer, tell the RegionServer to upload a region to etcd
-	DownloadRegion                   //Master send to RegionServer, tell the RegionServer to download a region from etcd
+	DownloadRegion                   // Master send to RegionServer, tell the RegionServer to download a region from etcd
 )

@@ -1,14 +1,22 @@
 package Region
 
 import (
+	"DiniSQL/MiniSQL/src/BufferManager"
+	"DiniSQL/MiniSQL/src/Interpreter/parser"
 	"DiniSQL/MiniSQL/src/Interpreter/types"
+	"DiniSQL/MiniSQL/src/Utils/Error"
+	"DiniSQL/MinisQL/src/API"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 	"unsafe"
 )
 
 var regionServer *RegionServer
+var StatementChannel chan types.DStatements
+var FinishChannel chan string
+var FlushChannel chan struct{}
 
 type RegionServer struct {
 	regions    []region
@@ -19,7 +27,11 @@ type RegionServer struct {
 func InitRegionServer() {
 	regionServer = new(RegionServer)
 	regionServer.visitCount = 0
-
+	StatementChannel = make(chan types.DStatements, 500)   //用于传输操作指令通道
+	FinishChannel = make(chan Error.Error, 500)            //用于api执行完成反馈通道
+	FlushChannel = make(chan struct{})                     //用于每条指令结束后协程flush
+	go API.HandleOneParse(StatementChannel, FinishChannel) //begin the runtime for exec
+	go BufferManager.BeginBlockFlush(FlushChannel)
 	listenFromClient(regionServer)
 }
 
@@ -31,13 +43,16 @@ func (server *RegionServer) heartBeat(conn net.Conn) {
 		p := Packet{Head: PacketHead{P_Type: KeepAlive, Op_Type: -1},
 			Payload: []byte(str)}
 		var replyBuf = make([]byte, p.Msgsize())
-		p.MarshalMsg(replyBuf)
+		replyBuf, err := p.MarshalMsg(replyBuf)
+		if err != nil {
+			fmt.Println(err)
+		}
 		conn.Write(replyBuf)
 	}
 }
 
 func listenFromClient(server *RegionServer) {
-	listen, err := net.Listen("tcp", "172.20.10.3")
+	listen, err := net.Listen("tcp", "127.0.0.1:3037")
 	if err != nil {
 		fmt.Println("Failed to listen to client!")
 		return
@@ -65,36 +80,38 @@ func (server *RegionServer) serve(conn net.Conn) {
 	p := Packet{}
 	for {
 		var buf = make([]byte, 1024)
-		conn.Read(buf)
+		_, err := conn.Read(buf)
+		if err != nil {
+			fmt.Println("Error: conn.Read()")
+			break
+		}
 		var content = byteSliceToString(buf)
 		if content == "end" {
 			break
 		} else {
 			p.UnmarshalMsg(buf)
+			var res string
 			if p.Head.P_Type == SQLOperation {
 				var statement = byteSliceToString(p.Payload)
-				switch p.Head.Op_Type {
-				case types.Select:
-					fmt.Println(statement)
-				case types.CreateDatabase:
-					fmt.Println(statement)
-				case types.DropDatabase:
-					fmt.Println(statement)
-				case types.CreateIndex:
-					fmt.Println(statement)
-				case types.DropIndex:
-					fmt.Println(statement)
-				case types.Insert:
-					fmt.Println(statement)
-				default:
-					fmt.Println(statement)
-				}
+				err = parser.Parse(strings.NewReader(string(statement)), StatementChannel)
+				res = <-FinishChannel
 			}
 			replyPacket := Packet{Head: PacketHead{P_Type: Result, Op_Type: -1},
-				Payload: []byte{1, 1, 1}}
-			var replyBuf = make([]byte, replyPacket.Msgsize())
-			replyPacket.MarshalMsg(replyBuf)
-			conn.Write(replyBuf)
+				Payload: []byte(res)}
+			var replyBuf = make([]byte, 0)
+			replyBuf, err = replyPacket.MarshalMsg(replyBuf)
+			if err != nil {
+				fmt.Println(err)
+			}
+			_, err := conn.Write(replyBuf)
+			if err != nil {
+				fmt.Println("Error: conn.Write()")
+				break
+			}
 		}
 	}
+}
+
+func Select(statement string) {
+
 }

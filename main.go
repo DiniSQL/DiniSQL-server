@@ -155,6 +155,10 @@ func runShell(r chan<- error) {
 
 // func main() {
 // 	//errChan 用于接收shell返回的err
+<<<<<<< HEAD
+// 	Region.InitRegionServer()
+=======
+>>>>>>> 45d7f851106a218e0eaff95b5b10c1ad95fde9cb
 // 	errChan := make(chan error)
 // 	go runShell(errChan) //开启shell协程
 // 	err := <-errChan
@@ -163,6 +167,8 @@ func runShell(r chan<- error) {
 // 		fmt.Println(err)
 // 	}
 // }
+<<<<<<< HEAD
+=======
 
 func main() {
 	var endpoints = []string{"127.0.0.1:2379"}
@@ -177,3 +183,4 @@ func main() {
 	// 	ser.Close()
 	}
 }
+>>>>>>> 45d7f851106a218e0eaff95b5b10c1ad95fde9cb
