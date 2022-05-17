@@ -15,7 +15,7 @@ import (
 
 var regionServer *RegionServer
 var StatementChannel chan types.DStatements
-var FinishChannel chan Error.Error
+var FinishChannel chan string
 var FlushChannel chan struct{}
 
 type RegionServer struct {
@@ -52,11 +52,7 @@ func (server *RegionServer) heartBeat(conn net.Conn) {
 }
 
 func listenFromClient(server *RegionServer) {
-<<<<<<< HEAD
 	listen, err := net.Listen("tcp", "127.0.0.1:3037")
-=======
-	listen, err := net.Listen("tcp", "172.20.10.3")
->>>>>>> 2dbe4e3ab1d2c750df55ef660f57304544004f6e
 	if err != nil {
 		fmt.Println("Failed to listen to client!")
 		return
@@ -94,14 +90,15 @@ func (server *RegionServer) serve(conn net.Conn) {
 			break
 		} else {
 			p.UnmarshalMsg(buf)
+			var res string
 			if p.Head.P_Type == SQLOperation {
 				var statement = byteSliceToString(p.Payload)
 				err = parser.Parse(strings.NewReader(string(statement)), StatementChannel)
-
+				res = <-FinishChannel
 			}
 			replyPacket := Packet{Head: PacketHead{P_Type: Result, Op_Type: -1},
-				Payload: []byte{1, 1, 1}}
-			var replyBuf = make([]byte, replyPacket.Msgsize())
+				Payload: []byte(res)}
+			var replyBuf = make([]byte, 0)
 			replyBuf, err = replyPacket.MarshalMsg(replyBuf)
 			if err != nil {
 				fmt.Println(err)
