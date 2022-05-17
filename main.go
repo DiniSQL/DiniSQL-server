@@ -7,9 +7,10 @@ import (
 	"DiniSQL/MiniSQL/src/Interpreter/parser"
 	"DiniSQL/MiniSQL/src/Interpreter/types"
 	"DiniSQL/MiniSQL/src/RecordManager"
-	"DiniSQL/MiniSQL/src/Utils/Error"
+	"DiniSQL/Region"
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -93,7 +94,7 @@ func runShell(r chan<- error) {
 	InitDB()
 
 	StatementChannel := make(chan types.DStatements, 500)  //用于传输操作指令通道
-	FinishChannel := make(chan Error.Error, 500)           //用于api执行完成反馈通道
+	FinishChannel := make(chan string, 500)                //用于api执行完成反馈通道
 	FlushChannel := make(chan struct{})                    //用于每条指令结束后协程flush
 	go API.HandleOneParse(StatementChannel, FinishChannel) //begin the runtime for exec
 	go BufferManager.BeginBlockFlush(FlushChannel)
@@ -144,7 +145,8 @@ func runShell(r chan<- error) {
 			fmt.Println(err)
 			continue
 		}
-		<-FinishChannel //等待指令执行完成
+		result := <-FinishChannel //等待指令执行完成
+		fmt.Println(result)
 		durationTime := time.Since(beginTime)
 		fmt.Println("Finish operation at: ", durationTime)
 		FlushChannel <- struct{}{} //开始刷新cache
@@ -153,7 +155,10 @@ func runShell(r chan<- error) {
 
 // func main() {
 // 	//errChan 用于接收shell返回的err
+<<<<<<< HEAD
 // 	Region.InitRegionServer()
+=======
+>>>>>>> 45d7f851106a218e0eaff95b5b10c1ad95fde9cb
 // 	errChan := make(chan error)
 // 	go runShell(errChan) //开启shell协程
 // 	err := <-errChan
@@ -162,3 +167,20 @@ func runShell(r chan<- error) {
 // 		fmt.Println(err)
 // 	}
 // }
+<<<<<<< HEAD
+=======
+
+func main() {
+	var endpoints = []string{"127.0.0.1:2379"}
+	ser, err := Region.NewServiceRegister(endpoints, "/web/node1", "localhost:8000", 5)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	//监听续租相应chan
+	go ser.ListenLeaseRespChan()
+	select {
+	// case <-time.After(20 * time.Second):
+	// 	ser.Close()
+	}
+}
+>>>>>>> 45d7f851106a218e0eaff95b5b10c1ad95fde9cb

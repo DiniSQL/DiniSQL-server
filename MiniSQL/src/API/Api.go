@@ -17,98 +17,127 @@ import (
 //HandleOneParse 用来处理parse处理完的DStatement类型  dataChannel是接收Statement的通道,整个mysql运行过程中不会关闭，但是quit后就会关闭
 //stopChannel 用来发送同步信号，每次处理完一个后就发送一个信号用来同步两协程，主协程需要接收到stopChannel的发送后才能继续下一条指令，当dataChannel
 //关闭后，stopChannel才会关闭
-func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- Error.Error) {
+func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- string) {
 	var err Error.Error
 	for statement := range dataChannel {
 		//fmt.Println(statement)
+		var ret string
 		switch statement.GetOperationType() {
 		case types.CreateDatabase:
 
 			err = CreateDatabaseAPI(statement.(types.CreateDatabaseStatement))
 			if err.Status != true {
-				fmt.Println(err.ErrorHint)
+				// fmt.Println(err.ErrorHint)
+				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
-				fmt.Println("create datbase success.")
+				// fmt.Println("create datbase success.")
+				ret = fmt.Sprintf("create datbase success.")
 			}
 
 		case types.UseDatabase:
 			err = UseDatabaseAPI(statement.(types.UseDatabaseStatement))
 			if err.Status != true {
-				fmt.Println(err.ErrorHint)
+				// fmt.Println(err.ErrorHint)
+				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
-				fmt.Printf("now you are using database.\n")
+				// fmt.Printf("now you are using database.\n")
+				ret = fmt.Sprintf("now you are using database.")
 			}
 
 		case types.CreateTable:
 			err = CreateTableAPI(statement.(types.CreateTableStatement))
 			if err.Status != true {
-				fmt.Println(err.ErrorHint)
+				// fmt.Println(err.ErrorHint)
+				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
-				fmt.Printf("create table succes.\n")
+				// fmt.Printf("create table succes.\n")
+				ret = fmt.Sprintf("create table succes.")
 			}
 
 		case types.CreateIndex:
 			err = CreateIndexAPI(statement.(types.CreateIndexStatement))
 			if err.Status != true {
-				fmt.Println(err.ErrorHint)
+				// fmt.Println(err.ErrorHint)
+				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
-				fmt.Printf("create index succes.\n")
+				// fmt.Printf("create index succes.\n")
+				ret = fmt.Sprintf("create index succes.")
 			}
+
 		case types.DropTable:
 			err = DropTableAPI(statement.(types.DropTableStatement))
 			if err.Status != true {
-				fmt.Println(err.ErrorHint)
+				// fmt.Println(err.ErrorHint)
+				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
-				fmt.Printf("drop table succes.\n")
+				// fmt.Printf("drop table succes.\n")
+				ret = fmt.Sprintf("drop table succes.")
 			}
 
 		case types.DropIndex:
 			err = DropIndexAPI(statement.(types.DropIndexStatement))
 			if err.Status != true {
-				fmt.Println(err.ErrorHint)
+				// fmt.Println(err.ErrorHint)
+				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
-				fmt.Printf("drop index succes.\n")
+				// fmt.Printf("drop index succes.\n")
+				ret = fmt.Sprintf("drop index succes.")
 			}
+
 		case types.DropDatabase:
 			err = DropDatabaseAPI(statement.(types.DropDatabaseStatement))
 			if err.Status != true {
-				fmt.Println(err.ErrorHint)
+				// fmt.Println(err.ErrorHint)
+				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
-				fmt.Printf("drop database succes.\n")
+				// fmt.Printf("drop database succes.\n")
+				ret = fmt.Sprintf("drop database succes.")
 			}
+
 		case types.Insert:
 			err = InsertAPI(statement.(types.InsertStament))
 			if err.Status != true {
-				fmt.Println(err.ErrorHint)
+				// fmt.Println(err.ErrorHint)
+				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
-				fmt.Printf("insert success, 1 row affected.\n")
+				// fmt.Printf("insert success, 1 row affected.\n")
+				ret = fmt.Sprintf("insert success, 1 row affected.")
 			}
+
 		case types.Update:
 			err = UpdateAPI(statement.(types.UpdateStament))
 			if err.Status != true {
-				fmt.Println(err.ErrorHint)
+				// fmt.Println(err.ErrorHint)
+				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
-				fmt.Printf("update success, %d rows are updated.\n", err.Rows)
+				// fmt.Printf("update success, %d rows are updated.\n", err.Rows)
+				ret = fmt.Sprintf("update success, %d rows are updated.", err.Rows)
 			}
+
 		case types.Delete:
 			err = DeleteAPI(statement.(types.DeleteStatement))
 			if err.Status != true {
-				fmt.Println(err.ErrorHint)
+				// fmt.Println(err.ErrorHint)
+				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
-				fmt.Printf("delete success, %d rows are deleted.\n", err.Rows)
+				// fmt.Printf("delete success, %d rows are deleted.\n", err.Rows)
+				ret = fmt.Sprintf("delete success, %d rows are deleted.", err.Rows)
 			}
+
 		case types.Select:
 			err = SelectAPI(statement.(types.SelectStatement))
 			if err.Status != true {
-				fmt.Println(err.ErrorHint)
+				// fmt.Println(err.ErrorHint)
+				ret = fmt.Sprintln(err.ErrorHint)
 			} else {
-				PrintTable(statement.(types.SelectStatement).TableNames[0], err.Data[err.Rows], err.Data[0:err.Rows]) //very dirty  but I have no other choose
+				ret = PrintTable(statement.(types.SelectStatement).TableNames[0], err.Data[err.Rows], err.Data[0:err.Rows]) //very dirty  but I have no other choose
 			}
 		case types.ExecFile:
 			err = ExecFileAPI(statement.(types.ExecFileStatement))
+			ret = fmt.Sprintln(err.ErrorHint)
 		}
 		//fmt.Println(err)
-		stopChannel <- err
+		stopChannel <- ret
 	}
 	close(stopChannel)
 }
@@ -319,7 +348,7 @@ func SelectAPI(statement types.SelectStatement) Error.Error {
 func ExecFileAPI(statement types.ExecFileStatement) Error.Error {
 	//parse协程 有缓冲信道
 	StatementChannel := make(chan types.DStatements, 500)
-	FinishChannel := make(chan Error.Error, 500)
+	FinishChannel := make(chan string, 500)
 	if !Utils.Exists(statement.FileName) {
 		return Error.CreateFailError(errors.New("file " + statement.FileName + " don't exist"))
 	}
