@@ -1,7 +1,10 @@
 package main
 
 import (
-	Type "DiniSQL/Client/type"
+	"DiniSQL/MiniSQL/src/API"
+	"DiniSQL/MiniSQL/src/Interpreter/parser"
+	"DiniSQL/MiniSQL/src/Interpreter/types"
+	Type "DiniSQL/Region"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -140,11 +143,11 @@ func KeepListening(ClientIP string, ClientPort int) (receivedPacket Type.Packet)
 	fmt.Printf("p.Head.Op_Type:%d\n", receivedPacket.Head.Op_Type)
 	fmt.Printf("p.Payload:%s\n", receivedPacket.Payload)
 
-	p := Type.Packet{Head: Type.PacketHead{P_Type: Type.KeepAlive, Op_Type: Type.CreateIndex},
-		Payload: []byte("foo")}
-	fmt.Printf("remote addr: %s\n", conn.RemoteAddr().String())
-	remoteAddr := strings.Split(conn.RemoteAddr().String(), ":")
-	ConnectToClient(remoteAddr[0], 8005, p)
+	//p := Type.Packet{Head: Type.PacketHead{P_Type: Type.KeepAlive, Op_Type: Type.CreateIndex},
+	//	Payload: []byte("foo")}
+	//fmt.Printf("remote addr: %s\n", conn.RemoteAddr().String())
+	//remoteAddr := strings.Split(conn.RemoteAddr().String(), ":")
+	//ConnectToClient(remoteAddr[0], 8005, p)
 
 	return
 
@@ -152,8 +155,20 @@ func KeepListening(ClientIP string, ClientPort int) (receivedPacket Type.Packet)
 
 func main() {
 	initMaster()
+	//reader, err := os.Open("1.txt")
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	StatementChannel := make(chan types.DStatements, 500)
+	FinishChannel := make(chan string, 500)
+	//FlushChannel := make(chan struct{})
+	go API.HandleOneParse(StatementChannel, FinishChannel)
 	fmt.Println("Initialized Master server")
-	// go KeepListening("127.0.0.1",8006)  // test locally
+	err := parser.Parse(strings.NewReader(string("create table a;")), StatementChannel) //开始解析
+	if err != nil {
+		log.Fatal(err)
+	}
+	close(StatementChannel) //关闭StatementChannel，进而关闭FinishChannel
 	for {
 		t := KeepListening(ClientIP, 9000)
 		fmt.Println(t)
