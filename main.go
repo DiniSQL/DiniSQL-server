@@ -7,7 +7,11 @@ import (
 	"DiniSQL/MiniSQL/src/Interpreter/parser"
 	"DiniSQL/MiniSQL/src/Interpreter/types"
 	"DiniSQL/MiniSQL/src/RecordManager"
+<<<<<<< HEAD
+	"DiniSQL/MiniSQL/src/Utils/Error"
+=======
 	"DiniSQL/Region"
+>>>>>>> 45d7f851106a218e0eaff95b5b10c1ad95fde9cb
 	"bufio"
 	"fmt"
 	"log"
