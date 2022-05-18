@@ -1,24 +1,13 @@
 package main
 
 import (
-	"DiniSQL/MiniSQL/src/BufferManager"
-	"DiniSQL/MiniSQL/src/CatalogManager"
+	"DiniSQL/MiniSQL"
 	"DiniSQL/Region"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os/exec"
 )
-
-func InitDB() error {
-	err := CatalogManager.LoadDbMeta()
-	if err != nil {
-		return err
-	}
-	BufferManager.InitBuffer()
-
-	return nil
-}
 
 func runEtcd() {
 	cmd := exec.Command("etcd", "--name", "infra1", "--initial-advertise-peer-urls", "http://192.168.84.244:2380",
@@ -62,6 +51,17 @@ func runEtcd() {
 // }
 
 func main() {
-	InitDB()
+	MiniSQL.InitDB()
 	Region.InitRegionServer()
 }
+
+// func main() {
+// 	//errChan 用于接收shell返回的err
+// 	errChan := make(chan error)
+// 	go MiniSQL.RunShell(errChan) //开启shell协程
+// 	err := <-errChan
+// 	fmt.Println("bye")
+// 	if err != nil {
+// 		fmt.Println(err)
+// 	}
+// }

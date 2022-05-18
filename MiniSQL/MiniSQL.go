@@ -69,7 +69,7 @@ func loadHistoryCommand() (*os.File, error) {
 	return file, err
 }
 
-func runShell(r chan<- error) {
+func RunShell(r chan<- error) {
 	line := liner.NewLiner()
 	defer line.Close()
 	line.SetCtrlCAborts(true)
@@ -150,14 +150,3 @@ func runShell(r chan<- error) {
 		FlushChannel <- struct{}{} //开始刷新cache
 	}
 }
-
-// func main() {
-// 	//errChan 用于接收shell返回的err
-// 	errChan := make(chan error)
-// 	go runShell(errChan) //开启shell协程
-// 	err := <-errChan
-// 	fmt.Println("bye")
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	}
-// }
