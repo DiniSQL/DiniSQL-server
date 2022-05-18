@@ -1,7 +1,6 @@
 package main
 
 import (
-	"DiniSQL/MiniSQL/src/API"
 	"DiniSQL/MiniSQL/src/Interpreter/parser"
 	"DiniSQL/MiniSQL/src/Interpreter/types"
 	Type "DiniSQL/Region"
@@ -13,11 +12,13 @@ import (
 )
 
 type RegionStatus struct {
-	regionID  int
-	rawStatus string
-	lastConn  int64
-	surviving bool
-	loadLevel int
+	regionIP   string
+	regionPort string
+	regionID   int
+	rawStatus  string
+	lastConn   int64
+	surviving  bool
+	loadLevel  int
 }
 
 const (
@@ -26,13 +27,13 @@ const (
 	ClientPort  = 6100
 )
 
-var tab2reg map[string]int
+var tab2reg map[string]*RegionStatus
 var id2reg map[int]*RegionStatus
 
 func initMaster() {
 	// Initialize the master server
-	tab2reg = make(map[string]int) // table name to region id
-	tab2reg["foo"] = 1
+	tab2reg = make(map[string]*RegionStatus) // table name to region status
+	tab2reg["foo"] = new(RegionStatus)
 	id2reg = make(map[int]*RegionStatus) // region id to region status
 	id2reg[0] = new(RegionStatus)
 	id2reg[0].regionID = 1
@@ -161,17 +162,27 @@ func main() {
 	//}
 	StatementChannel := make(chan types.DStatements, 500)
 	FinishChannel := make(chan string, 500)
+	TablesChannel := make(chan []string, 500)
 	//FlushChannel := make(chan struct{})
-	go API.HandleOneParse(StatementChannel, FinishChannel)
-	fmt.Println("Initialized Master server")
-	err := parser.Parse(strings.NewReader(string("create table a;")), StatementChannel) //开始解析
+	go Parse2Statement(StatementChannel, FinishChannel, TablesChannel)
+	//fmt.Println("Initialized Master server")
+	var sql_strings = []string{
+		"create table tab1(a int);",
+		"select a from tab2;",
+	}
+
+	err := parser.Parse(strings.NewReader(sql_strings[0]), StatementChannel) //开始解析
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println(<-TablesChannel)
 	close(StatementChannel) //关闭StatementChannel，进而关闭FinishChannel
+	for _ = range FinishChannel {
+
+	}
 	for {
-		t := KeepListening(ClientIP, 9000)
-		fmt.Println(t)
+		client := KeepListening(ClientIP, 9000)
+		fmt.Println(client)
 
 		//ConnectToRegion("127.0.0.1", 8006, p)
 	}
