@@ -51,6 +51,12 @@ func (z *Packet) DecodeMsg(dc *msgp.Reader) (err error) {
 						err = msgp.WrapError(err, "Head", "Op_Type")
 						return
 					}
+				case "Spare":
+					z.Head.Spare, err = dc.ReadString()
+					if err != nil {
+						err = msgp.WrapError(err, "Head", "Spare")
+						return
+					}
 				default:
 					err = dc.Skip()
 					if err != nil {
@@ -84,9 +90,9 @@ func (z *Packet) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	// map header, size 2
+	// map header, size 3
 	// write "P_Type"
-	err = en.Append(0x82, 0xa6, 0x50, 0x5f, 0x54, 0x79, 0x70, 0x65)
+	err = en.Append(0x83, 0xa6, 0x50, 0x5f, 0x54, 0x79, 0x70, 0x65)
 	if err != nil {
 		return
 	}
@@ -103,6 +109,16 @@ func (z *Packet) EncodeMsg(en *msgp.Writer) (err error) {
 	err = en.WriteInt(z.Head.Op_Type)
 	if err != nil {
 		err = msgp.WrapError(err, "Head", "Op_Type")
+		return
+	}
+	// write "Spare"
+	err = en.Append(0xa5, 0x53, 0x70, 0x61, 0x72, 0x65)
+	if err != nil {
+		return
+	}
+	err = en.WriteString(z.Head.Spare)
+	if err != nil {
+		err = msgp.WrapError(err, "Head", "Spare")
 		return
 	}
 	// write "Payload"
@@ -124,13 +140,16 @@ func (z *Packet) MarshalMsg(b []byte) (o []byte, err error) {
 	// map header, size 2
 	// string "Head"
 	o = append(o, 0x82, 0xa4, 0x48, 0x65, 0x61, 0x64)
-	// map header, size 2
+	// map header, size 3
 	// string "P_Type"
-	o = append(o, 0x82, 0xa6, 0x50, 0x5f, 0x54, 0x79, 0x70, 0x65)
+	o = append(o, 0x83, 0xa6, 0x50, 0x5f, 0x54, 0x79, 0x70, 0x65)
 	o = msgp.AppendInt(o, z.Head.P_Type)
 	// string "Op_Type"
 	o = append(o, 0xa7, 0x4f, 0x70, 0x5f, 0x54, 0x79, 0x70, 0x65)
 	o = msgp.AppendInt(o, z.Head.Op_Type)
+	// string "Spare"
+	o = append(o, 0xa5, 0x53, 0x70, 0x61, 0x72, 0x65)
+	o = msgp.AppendString(o, z.Head.Spare)
 	// string "Payload"
 	o = append(o, 0xa7, 0x50, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64)
 	o = msgp.AppendBytes(o, z.Payload)
@@ -182,6 +201,12 @@ func (z *Packet) UnmarshalMsg(bts []byte) (o []byte, err error) {
 						err = msgp.WrapError(err, "Head", "Op_Type")
 						return
 					}
+				case "Spare":
+					z.Head.Spare, bts, err = msgp.ReadStringBytes(bts)
+					if err != nil {
+						err = msgp.WrapError(err, "Head", "Spare")
+						return
+					}
 				default:
 					bts, err = msgp.Skip(bts)
 					if err != nil {
@@ -210,7 +235,7 @@ func (z *Packet) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Packet) Msgsize() (s int) {
-	s = 1 + 5 + 1 + 7 + msgp.IntSize + 8 + msgp.IntSize + 8 + msgp.BytesPrefixSize + len(z.Payload)
+	s = 1 + 5 + 1 + 7 + msgp.IntSize + 8 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Head.Spare) + 8 + msgp.BytesPrefixSize + len(z.Payload)
 	return
 }
 
@@ -244,6 +269,12 @@ func (z *PacketHead) DecodeMsg(dc *msgp.Reader) (err error) {
 				err = msgp.WrapError(err, "Op_Type")
 				return
 			}
+		case "Spare":
+			z.Spare, err = dc.ReadString()
+			if err != nil {
+				err = msgp.WrapError(err, "Spare")
+				return
+			}
 		default:
 			err = dc.Skip()
 			if err != nil {
@@ -257,9 +288,9 @@ func (z *PacketHead) DecodeMsg(dc *msgp.Reader) (err error) {
 
 // EncodeMsg implements msgp.Encodable
 func (z PacketHead) EncodeMsg(en *msgp.Writer) (err error) {
-	// map header, size 2
+	// map header, size 3
 	// write "P_Type"
-	err = en.Append(0x82, 0xa6, 0x50, 0x5f, 0x54, 0x79, 0x70, 0x65)
+	err = en.Append(0x83, 0xa6, 0x50, 0x5f, 0x54, 0x79, 0x70, 0x65)
 	if err != nil {
 		return
 	}
@@ -278,19 +309,32 @@ func (z PacketHead) EncodeMsg(en *msgp.Writer) (err error) {
 		err = msgp.WrapError(err, "Op_Type")
 		return
 	}
+	// write "Spare"
+	err = en.Append(0xa5, 0x53, 0x70, 0x61, 0x72, 0x65)
+	if err != nil {
+		return
+	}
+	err = en.WriteString(z.Spare)
+	if err != nil {
+		err = msgp.WrapError(err, "Spare")
+		return
+	}
 	return
 }
 
 // MarshalMsg implements msgp.Marshaler
 func (z PacketHead) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.Require(b, z.Msgsize())
-	// map header, size 2
+	// map header, size 3
 	// string "P_Type"
-	o = append(o, 0x82, 0xa6, 0x50, 0x5f, 0x54, 0x79, 0x70, 0x65)
+	o = append(o, 0x83, 0xa6, 0x50, 0x5f, 0x54, 0x79, 0x70, 0x65)
 	o = msgp.AppendInt(o, z.P_Type)
 	// string "Op_Type"
 	o = append(o, 0xa7, 0x4f, 0x70, 0x5f, 0x54, 0x79, 0x70, 0x65)
 	o = msgp.AppendInt(o, z.Op_Type)
+	// string "Spare"
+	o = append(o, 0xa5, 0x53, 0x70, 0x61, 0x72, 0x65)
+	o = msgp.AppendString(o, z.Spare)
 	return
 }
 
@@ -324,6 +368,12 @@ func (z *PacketHead) UnmarshalMsg(bts []byte) (o []byte, err error) {
 				err = msgp.WrapError(err, "Op_Type")
 				return
 			}
+		case "Spare":
+			z.Spare, bts, err = msgp.ReadStringBytes(bts)
+			if err != nil {
+				err = msgp.WrapError(err, "Spare")
+				return
+			}
 		default:
 			bts, err = msgp.Skip(bts)
 			if err != nil {
@@ -338,6 +388,6 @@ func (z *PacketHead) UnmarshalMsg(bts []byte) (o []byte, err error) {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z PacketHead) Msgsize() (s int) {
-	s = 1 + 7 + msgp.IntSize + 8 + msgp.IntSize
+	s = 1 + 7 + msgp.IntSize + 8 + msgp.IntSize + 6 + msgp.StringPrefixSize + len(z.Spare)
 	return
 }
