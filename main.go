@@ -7,14 +7,8 @@ import (
 	"DiniSQL/MiniSQL/src/Interpreter/parser"
 	"DiniSQL/MiniSQL/src/Interpreter/types"
 	"DiniSQL/MiniSQL/src/RecordManager"
-<<<<<<< HEAD
-	"DiniSQL/MiniSQL/src/Utils/Error"
-=======
-	"DiniSQL/Region"
->>>>>>> 45d7f851106a218e0eaff95b5b10c1ad95fde9cb
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,16 +24,6 @@ func FlushALl() {
 	BufferManager.BlockFlushAll()                                             //缓存block
 	RecordManager.FlushFreeList()                                             //free list写回
 	CatalogManager.FlushDatabaseMeta(CatalogManager.UsingDatabase.DatabaseId) //刷新记录长度和余量
-}
-
-func InitDB() error {
-	err := CatalogManager.LoadDbMeta()
-	if err != nil {
-		return err
-	}
-	BufferManager.InitBuffer()
-
-	return nil
 }
 
 func expandPath(path string) (string, error) {
@@ -168,16 +152,16 @@ func runShell(r chan<- error) {
 // 	}
 // }
 
-func main() {
-	var endpoints = []string{"127.0.0.1:2379"}
-	ser, err := Region.NewServiceRegister(endpoints, "/web/node1", "localhost:8000", 5)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	//监听续租相应chan
-	go ser.ListenLeaseRespChan()
-	select {
-	// case <-time.After(20 * time.Second):
-	// 	ser.Close()
-	}
-}
+// func main() {
+// 	var endpoints = []string{"127.0.0.1:2379"}
+// 	ser, err := Region.NewServiceRegister(endpoints, "/web/node1", "localhost:8000", 5)
+// 	if err != nil {
+// 		log.Fatalln(err)
+// 	}
+// 	//监听续租相应chan
+// 	go ser.ListenLeaseRespChan()
+// 	select {
+// 	// case <-time.After(20 * time.Second):
+// 	// 	ser.Close()
+// 	}
+// }
