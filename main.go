@@ -1,41 +1,6 @@
 package main
 
 import (
-<<<<<<< HEAD
-	"DiniSQL/MiniSQL/src/API"
-	"DiniSQL/MiniSQL/src/BufferManager"
-	"DiniSQL/MiniSQL/src/CatalogManager"
-	"DiniSQL/MiniSQL/src/Interpreter/parser"
-	"DiniSQL/MiniSQL/src/Interpreter/types"
-	"DiniSQL/MiniSQL/src/RecordManager"
-	"bufio"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-	"time"
-
-	"github.com/peterh/liner"
-)
-
-const historyCommmandFile = "~/.DiniSQL_history"
-
-//FlushALl 结束时做的所有工作
-func FlushALl() {
-	BufferManager.BlockFlushAll()                                             //缓存block
-	RecordManager.FlushFreeList()                                             //free list写回
-	CatalogManager.FlushDatabaseMeta(CatalogManager.UsingDatabase.DatabaseId) //刷新记录长度和余量
-}
-
-func expandPath(path string) (string, error) {
-	if strings.HasPrefix(path, "~/") {
-		parts := strings.SplitN(path, "/", 2)
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(home, parts[1]), nil
-=======
 	"DiniSQL/MiniSQL"
 	"DiniSQL/Region"
 	"fmt"
@@ -60,7 +25,6 @@ func runEtcd() {
 	defer stout.Close()
 	if err := cmd.Start(); err != nil {
 		log.Fatalln(err)
->>>>>>> d83281e932449187e7dedc8b7d5e4db7c4847aaa
 	}
 
 	if opBytes, err := ioutil.ReadAll(stout); err != nil {
@@ -101,7 +65,6 @@ func main() {
 // 		fmt.Println(err)
 // 	}
 // }
-<<<<<<< HEAD
 
 // func main() {
 // 	var endpoints = []string{"127.0.0.1:2379"}
@@ -116,5 +79,3 @@ func main() {
 // 	// 	ser.Close()
 // 	}
 // }
-=======
->>>>>>> d83281e932449187e7dedc8b7d5e4db7c4847aaa
