@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 	"unsafe"
+
+	"github.com/tinylib/msgp/msgp"
 )
 
 var regionServer *RegionServer
@@ -51,6 +53,7 @@ func InitRegionServer() {
 	go API.HandleOneParse(StatementChannel, FinishChannel) //begin the runtime for exec
 	go BufferManager.BeginBlockFlush(FlushChannel)
 	go PeriodicallyFlush()
+
 	op := "create database " + databaseName + ";"
 	err := parser.Parse(strings.NewReader(op), StatementChannel)
 	if err != nil {
@@ -58,6 +61,7 @@ func InitRegionServer() {
 	}
 	fmt.Println(<-FinishChannel)
 	FlushChannel <- struct{}{} //开始刷新cache
+
 	op = "use database " + databaseName + ";"
 	err = parser.Parse(strings.NewReader(op), StatementChannel)
 	if err != nil {
@@ -65,11 +69,24 @@ func InitRegionServer() {
 	}
 	fmt.Println(<-FinishChannel)
 	FlushChannel <- struct{}{} //开始刷新cache
-	// err = parser.Parse(strings.NewReader(string("insert into student values(1080100001,'name1',99);")), StatementChannel)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// fmt.Println(<-FinishChannel)
+
+	// This part is for testing
+	op = "create table student2(id int, name char(12) unique, score float,primary key(id) );"
+	err = parser.Parse(strings.NewReader(op), StatementChannel)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(<-FinishChannel)
+	FlushChannel <- struct{}{} //开始刷新cache
+
+	op = "insert into student2 values(1080100001,'name1',99);"
+	err = parser.Parse(strings.NewReader(op), StatementChannel)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(<-FinishChannel)
+	FlushChannel <- struct{}{} //开始刷新cache
+
 	listenFromClient(regionServer)
 }
 
@@ -90,6 +107,13 @@ func (server *RegionServer) heartBeat(conn net.Conn) {
 }
 
 func listenFromClient(server *RegionServer) {
+	// This Upload is for testing
+	opRes, err := Upload("student2", "127.0.0.1:3036")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	fmt.Println(opRes)
 	listen, err := net.Listen("tcp", ":3037")
 	fmt.Println("Server started")
 	if err != nil {
@@ -118,17 +142,11 @@ func (server *RegionServer) serve(conn net.Conn) {
 	server.visitCount++
 
 	var p Packet
-	var res = make([]byte, 1024)
+	rd := msgp.NewReader(conn)
+	wt := msgp.NewWriter(conn)
 
-	_, err := conn.Read(res)
+	err := p.DecodeMsg(rd)
 	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	_, err = p.UnmarshalMsg(res)
-	if err != nil {
-		fmt.Println("UnmarshalMsg failed")
 		fmt.Println(err)
 	}
 
@@ -143,12 +161,7 @@ func (server *RegionServer) serve(conn net.Conn) {
 		}
 		replyPacket := Packet{Head: PacketHead{P_Type: Result, Op_Type: -1},
 			Payload: []byte(opRes)}
-		var replyBuf = make([]byte, 0)
-		replyBuf, err = replyPacket.MarshalMsg(replyBuf)
-		if err != nil {
-			fmt.Println("MarshalMsg failed")
-		}
-		_, err = conn.Write(replyBuf)
+		replyPacket.EncodeMsg(wt)
 		if err != nil {
 			fmt.Println("Error: conn.Write()")
 		}
@@ -162,17 +175,15 @@ func (server *RegionServer) serve(conn net.Conn) {
 		fmt.Println(opRes)
 	} else if p.Head.P_Type == RegionTransferPrepare {
 		opRes, err, num := PrepareForTransfer(server, p)
+		fmt.Println(opRes)
 		if err != nil {
 			fmt.Println(err)
 		}
-		buf := make([]byte, 1<<20)
 		for i := 0; i < num; i++ {
-			_, err = conn.Read(buf)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			_, err = p.UnmarshalMsg(buf)
+			p.DecodeMsg(rd)
+			fmt.Println("p.Head.P_Type: ", p.Head.P_Type)
+			fmt.Println("p.Head.Op_Type: ", p.Head.Op_Type)
+			fmt.Println("p.Head.Spare: ", p.Head.Spare)
 			if err != nil {
 				fmt.Println("UnmarshalMsg failed")
 				fmt.Println(err)
@@ -184,7 +195,6 @@ func (server *RegionServer) serve(conn net.Conn) {
 			}
 			fmt.Println(opRes)
 		}
-		fmt.Println(opRes)
 	} else if p.Head.P_Type == RegionTransfer {
 		DownloadTransfer(p)
 	}
@@ -198,6 +208,7 @@ func ExecuteSQLOperation(server *RegionServer, statement string, t types.Operati
 	opRes = <-FinishChannel
 	FlushChannel <- struct{}{} //开始刷新cache
 	fmt.Println(opRes)
+
 	if t == types.CreateTable {
 		new_table := strings.Split(opRes, " ")[1]
 		server.tables = append(server.tables, new_table)
@@ -215,8 +226,8 @@ func ExecuteSQLOperation(server *RegionServer, statement string, t types.Operati
 
 func Upload(table string, to string) (opRes string, err error) {
 	catalog := CatalogManager.GetTableCatalogUnsafe(table)
-	buf := make([]byte, 0)
-	buf, err = catalog.MarshalMsg(buf)
+	catalogBuf := make([]byte, 0)
+	catalogBuf, err = catalog.MarshalMsg(catalogBuf)
 	if err != nil {
 		return
 	}
@@ -225,20 +236,20 @@ func Upload(table string, to string) (opRes string, err error) {
 		return
 	}
 	conn, err := net.Dial("tcp", to)
-	defer conn.Close()
 	if err != nil {
 		return
 	}
-	preparePacket := Packet{Head: PacketHead{P_Type: RegionTransferPrepare, Op_Type: len(matches), Spare: table}, Payload: buf}
-	buf, err = preparePacket.MarshalMsg(buf)
+
+	preparePacket := Packet{Head: PacketHead{P_Type: RegionTransferPrepare, Op_Type: len(matches), Spare: table},
+		Payload: catalogBuf}
+	wt := msgp.NewWriter(conn)
+	err = preparePacket.EncodeMsg(wt)
 	if err != nil {
 		return
 	}
-	_, err = conn.Write(buf)
-	if err != nil {
-		return
-	}
+
 	for i := range matches {
+		fmt.Println(matches[i])
 		file, err := os.Open(matches[i])
 		if err != nil {
 			panic(err)
@@ -247,15 +258,13 @@ func Upload(table string, to string) (opRes string, err error) {
 		if err != nil {
 			panic(err)
 		}
-		packet := Packet{Head: PacketHead{P_Type: RegionTransfer, Op_Type: i, Spare: matches[i]}, Payload: content}
-		buf, err = packet.MarshalMsg(buf)
+		packet := Packet{Head: PacketHead{P_Type: RegionTransfer, Op_Type: i, Spare: strings.Split(matches[i], "\\")[2]},
+			Payload: content}
+		err = packet.EncodeMsg(wt)
 		if err != nil {
 			fmt.Println(err)
 		}
-		_, err = conn.Write(buf)
-		if err != nil {
-			fmt.Println(err)
-		}
+		time.Sleep(3 * time.Second)
 	}
 	opRes = "Upload Success"
 	return
@@ -288,7 +297,7 @@ func DownloadTransfer(p Packet) (opRes string, err error) {
 	}
 	_, err = file.Write(p.Payload)
 	if err == nil {
-		opRes = filename + "download success"
+		opRes = filename + " download success"
 	}
 	return
 }
