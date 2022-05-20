@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"sort"
 	"strings"
 )
 
@@ -27,23 +28,48 @@ const (
 	ClientPort  = 6100
 )
 
-var tab2reg map[string]*RegionStatus
+var tab2reg map[string][]RegionStatus
 var id2reg map[int]*RegionStatus
 var regionCnt int
 var StatementChannel chan types.DStatements
 var FinishChannel chan string
 var TablesChannel chan []string
 
+var regionStatus map[string]*RegionStatus // region name to region status
+var sortedRegions []RegionStatus
+
 //var StatementChannel = make(chan types.DStatements, 500)
 
 func initMaster() {
 	// Initialize the master server
-	tab2reg = make(map[string]*RegionStatus) // table name to region status
-	tab2reg["foo"] = new(RegionStatus)
+	tab2reg = make(map[string][]RegionStatus) // table name to region status
+	tab2reg["foo"] = append(tab2reg["foo"], RegionStatus{})
 	regionCnt = 0
 	id2reg = make(map[int]*RegionStatus) // region id to region status
 	id2reg[0] = new(RegionStatus)
 	id2reg[0].regionID = 1
+
+}
+
+func regionList(status []RegionStatus) string {
+	var ret string
+	for _, region := range status {
+		ret += region.regionIP + ":" + region.regionPort + ";"
+	}
+	return ret
+}
+
+func findRelaxRegion(count int) []RegionStatus {
+	var relaxRegions []RegionStatus
+	sort.Slice(sortedRegions, func(i, j int) bool {
+		return sortedRegions[i].loadLevel < sortedRegions[j].loadLevel
+	})
+	for idx, region := range sortedRegions {
+		if count <= idx {
+			relaxRegions = append(relaxRegions, region)
+		}
+	}
+	return relaxRegions
 
 }
 
@@ -128,24 +154,40 @@ func CreatePacket(statement types.DStatements, tables []string) Type.Packet {
 	case types.CreateDatabase:
 	case types.UseDatabase:
 	case types.CreateTable:
-		//numRegions := min(3, regionCnt)
+		selCnt := min(3, regionCnt) // select specified number of regions
+		relaxRegions := findRelaxRegion(selCnt)
+		pay = regionList(relaxRegions)
 
 	case types.CreateIndex:
+		regions := tab2reg[tables[0]]
+		pay = regionList(regions)
 
 	case types.DropTable:
+		regions := tab2reg[tables[0]]
+		pay = regionList(regions)
 
 	case types.DropIndex:
+		regions := tab2reg[tables[0]]
+		pay = regionList(regions)
 
-	case types.DropDatabase:
 	case types.Insert:
+		regions := tab2reg[tables[0]]
+		pay = regionList(regions)
 
 	case types.Update:
+		regions := tab2reg[tables[0]]
+		pay = regionList(regions)
 
 	case types.Delete:
+		regions := tab2reg[tables[0]]
+		pay = regionList(regions)
 
 	case types.Select:
+		regions := tab2reg[tables[0]]
+		pay = regionList(regions)
 
 	case types.ExecFile:
+	case types.DropDatabase:
 
 	}
 	packet.Payload = []byte(pay)
@@ -187,9 +229,8 @@ func HandleClient(ClientIP string, ClientPort int) (receivedPacket Type.Packet) 
 	tabs := <-TablesChannel
 	statement := <-StatementChannel
 	fmt.Println("tabs:", tabs)
-	targetRegion := tab2reg[tabs[0]]
-	p := Type.Packet{Head: Type.PacketHead{P_Type: Type.Answer, Op_Type: statement.GetOperationType()},
-		Payload: []byte(targetRegion.regionIP + ":" + targetRegion.regionPort)}
+
+	p := CreatePacket(statement, tabs)
 	packetBuf := make([]byte, 500)
 	packetBuf, err = p.MarshalMsg(packetBuf)
 	if err != nil {
@@ -210,10 +251,7 @@ func HandleClient(ClientIP string, ClientPort int) (receivedPacket Type.Packet) 
 // 对于不同的
 func main() {
 	initMaster()
-	//reader, err := os.Open("1.txt")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
+
 	StatementChannel = make(chan types.DStatements, 500)
 	FinishChannel = make(chan string, 500)
 	TablesChannel = make(chan []string, 500)
