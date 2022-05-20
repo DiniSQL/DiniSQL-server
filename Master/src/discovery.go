@@ -99,7 +99,7 @@ func (s *ServiceDiscovery) Close() error {
 	return s.cli.Close()
 }
 
-func main1() {
+func updateRegionStatus() {
 	var endpoints = []string{"localhost:2379"}
 	ser := NewServiceDiscovery(endpoints)
 	defer ser.Close()
@@ -108,6 +108,9 @@ func main1() {
 	for {
 		select {
 		case <-time.Tick(5 * time.Second):
+			// TODO:维护regionStatus
+			// TODO:维护sortedRegions
+			regionCnt = len(ser.serverList) // update server count
 			log.Println(ser.GetServices())
 		}
 	}
