@@ -165,6 +165,8 @@ func CreatePacket(statement types.DStatements, tables []string) Type.Packet {
 		selCnt := min(3, regionCnt) // select specified number of regions
 		relaxRegions := findRelaxRegion(selCnt)
 		pay = regionList(relaxRegions)
+		tab2reg[tables[0]] = relaxRegions
+		tableSer.tableList[tables[0]] = regionList(relaxRegions)
 
 	case types.CreateIndex:
 		regions := tab2reg[tables[0]]

@@ -1,8 +1,12 @@
 package main
 
 import (
+	Type "DiniSQL/Region"
 	"context"
 	"log"
+	"math/rand"
+	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -15,9 +19,13 @@ import (
 type ServiceDiscovery struct {
 	cli        *clientv3.Client  //etcd client
 	serverList map[string]string //连接上的Region, key是IP:port, value是Region的访问次数
-	tableList  map[string]string
+	tableList  map[string]string // table name map to region
 	lock       sync.Mutex
 }
+
+var endpoints = []string{"localhost:2379"}
+var regionSer *ServiceDiscovery = NewServiceDiscovery(endpoints) // 每个region的IP:PORT和它对应的访问次数
+var tableSer *ServiceDiscovery = NewServiceDiscovery(endpoints)  // 每个table的拥有对应table的region们地址
 
 //NewServiceDiscovery  新建发现服务
 func NewServiceDiscovery(endpoints []string) *ServiceDiscovery {
@@ -69,7 +77,7 @@ func (s *ServiceDiscovery) watcher(prefix string) {
 	}
 }
 
-//UpdateList 新增服务地址
+//UpdateList 用于通过etcd更新维护本地数据
 func (s *ServiceDiscovery) UpdateList(key, val string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -91,12 +99,50 @@ func (s *ServiceDiscovery) DelServiceList(key string) {
 	defer s.lock.Unlock()
 	if strings.HasPrefix(key, "/region/") {
 		key = key[len("/region/"):]
+		s.HandleRegionQuit(key)
 		delete(s.serverList, key)
-		log.Println("[ regionList DROP ]: ", "key :", key)
+		log.Println("[ regionList DROP (region QUIT! )]: ", "key :", key)
 	} else if strings.HasPrefix(key, "/table/") {
 		key = key[len("/table/"):]
 		delete(s.tableList, key)
 		log.Println("[ tableList DROP ]: ", "key :", key)
+	}
+}
+
+//HandleRegionQuit 处理某个region由于意外退出
+// name 是region的IP:PORT
+func (s *ServiceDiscovery) HandleRegionQuit(name string) {
+	lostTables := s.tableList[name]
+	for _, table := range strings.Split(lostTables, ";") {
+		owndRegionList := s.tableList[table]
+		hasTableRegionStr := strings.Replace(owndRegionList, name+";", "", -1)
+		hasTableRegionList := strings.Split(hasTableRegionStr, ";")
+		// 从拥有丢失表的region中挑一个发给另一个region
+		srcRegion := hasTableRegionList[rand.Intn(len(hasTableRegionList))]
+		targetRegion := domStr(sortedRegions[0].regionIP, sortedRegions[0].regionPort, true)
+		p := Type.Packet{}
+		p.Head = Type.PacketHead{P_Type: Type.UploadRegion, Op_Type: -1, Spare: ""}
+		p.Payload = []byte(srcRegion + ";" + table + ";" + targetRegion) // TODO: implement real payload
+		i, _ := strconv.Atoi(strings.Split(srcRegion, ":")[1])
+		address := net.TCPAddr{
+			IP:   net.ParseIP(strings.Split(srcRegion, ":")[0]),
+			Port: i,
+		}
+		conn, err := net.DialTCP("tcp4", nil, &address)
+		if err != nil {
+			log.Fatal(err) // Println + os.Exit(1)
+			return
+		}
+		var packetBuf = make([]byte, 0)
+		packetBuf, err = p.MarshalMsg(packetBuf)
+		_, err1 := conn.Write(packetBuf)
+		if err1 != nil {
+			log.Println(err)
+			conn.Close()
+			return
+		}
+		conn.Close()
+
 	}
 }
 
@@ -112,20 +158,26 @@ func (s *ServiceDiscovery) GetServices() []string {
 	return addrs
 }
 
-func (s *ServiceDiscovery) updRegStat() {
-	sortedRegions = []RegionStatus{}
-}
-
 //Close 关闭服务
 func (s *ServiceDiscovery) Close() error {
 	return s.cli.Close()
 }
 
+func (s *ServiceDiscovery) HandleUpdate(regionSer *ServiceDiscovery, tableSer *ServiceDiscovery) {
+	newRegionCnt := len(regionSer.serverList) // new server count
+	if newRegionCnt < regionCnt {
+		log.Println("[ regionList DROP ]: ", "key :", regionSer.serverList)
+		regionCnt = newRegionCnt
+	} else {
+		regionCnt = newRegionCnt
+	}
+
+}
+
 func masterDiscovery() {
-	var endpoints = []string{"localhost:2379"}
-	regionSer := NewServiceDiscovery(endpoints) // 每个region的IP:PORT和它对应的访问次数
+	//regionSer := NewServiceDiscovery(endpoints) // 每个region的IP:PORT和它对应的访问次数
 	regionSer.WatchService("/region/")
-	tableSer := NewServiceDiscovery(endpoints) // 每个table的拥有对应table的region们地址
+	//tableSer := NewServiceDiscovery(endpoints) // 每个table的拥有对应table的region们地址
 	tableSer.WatchService("/table/")
 	defer regionSer.Close()
 	defer tableSer.Close()
@@ -136,7 +188,6 @@ func masterDiscovery() {
 		case <-time.Tick(5 * time.Second):
 			// TODO:维护regionStatus
 			// TODO:维护sortedRegions
-			regionCnt = len(regionSer.serverList) // update server count
 
 			log.Println(regionSer.GetServices())
 		}
