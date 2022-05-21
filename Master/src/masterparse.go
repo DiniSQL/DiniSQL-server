@@ -30,6 +30,7 @@ func Parse2Statement(dataChannel <-chan types.DStatements, stopChannel chan<- st
 			tableChannel <- []string{statement.(types.DropTableStatement).TableName}
 
 		case types.DropIndex:
+			tableChannel <- []string{statement.(types.DropIndexStatement).TableName}
 
 		case types.DropDatabase:
 

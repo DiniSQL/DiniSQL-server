@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,7 +14,8 @@ import (
 //ServiceDiscovery 服务发现
 type ServiceDiscovery struct {
 	cli        *clientv3.Client  //etcd client
-	serverList map[string]string //服务列表
+	serverList map[string]string //连接上的Region, key是IP:port, value是Region的访问次数
+	tableList  map[string]string
 	lock       sync.Mutex
 }
 
@@ -41,8 +43,9 @@ func (s *ServiceDiscovery) WatchService(prefix string) error {
 		return err
 	}
 
+	// 原有的k和v
 	for _, ev := range resp.Kvs {
-		s.SetServiceList(string(ev.Key), string(ev.Value))
+		s.UpdateList(string(ev.Key), string(ev.Value))
 	}
 
 	//监视前缀，修改变更的server
@@ -58,7 +61,7 @@ func (s *ServiceDiscovery) watcher(prefix string) {
 		for _, ev := range wresp.Events {
 			switch ev.Type {
 			case mvccpb.PUT: //修改或者新增
-				s.SetServiceList(string(ev.Kv.Key), string(ev.Kv.Value))
+				s.UpdateList(string(ev.Kv.Key), string(ev.Kv.Value))
 			case mvccpb.DELETE: //删除
 				s.DelServiceList(string(ev.Kv.Key))
 			}
@@ -66,20 +69,35 @@ func (s *ServiceDiscovery) watcher(prefix string) {
 	}
 }
 
-//SetServiceList 新增服务地址
-func (s *ServiceDiscovery) SetServiceList(key, val string) {
+//UpdateList 新增服务地址
+func (s *ServiceDiscovery) UpdateList(key, val string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	s.serverList[key] = string(val)
-	log.Println("put key :", key, "val:", val)
+	if strings.HasPrefix(key, "/region/") {
+		key = key[len("/region/"):]
+		s.serverList[key] = val
+		log.Println("[ regionList PUT ]: ", "key :", key, "val:", val)
+	} else if strings.HasPrefix(key, "/table/") {
+		key = key[len("/table/"):]
+		s.tableList[key] = val
+		log.Println("[ tableList PUT ]: ", "key :", key, "val:", val)
+
+	}
 }
 
 //DelServiceList 删除服务地址
 func (s *ServiceDiscovery) DelServiceList(key string) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-	delete(s.serverList, key)
-	log.Println("del key:", key)
+	if strings.HasPrefix(key, "/region/") {
+		key = key[len("/region/"):]
+		delete(s.serverList, key)
+		log.Println("[ regionList DROP ]: ", "key :", key)
+	} else if strings.HasPrefix(key, "/table/") {
+		key = key[len("/table/"):]
+		delete(s.tableList, key)
+		log.Println("[ tableList DROP ]: ", "key :", key)
+	}
 }
 
 //GetServices 获取服务地址
@@ -94,24 +112,33 @@ func (s *ServiceDiscovery) GetServices() []string {
 	return addrs
 }
 
+func (s *ServiceDiscovery) updRegStat() {
+	sortedRegions = []RegionStatus{}
+}
+
 //Close 关闭服务
 func (s *ServiceDiscovery) Close() error {
 	return s.cli.Close()
 }
 
-func updateRegionStatus() {
+func masterDiscovery() {
 	var endpoints = []string{"localhost:2379"}
-	ser := NewServiceDiscovery(endpoints)
-	defer ser.Close()
-	ser.WatchService("/web/")
-	ser.WatchService("/gRPC/")
+	regionSer := NewServiceDiscovery(endpoints) // 每个region的IP:PORT和它对应的访问次数
+	regionSer.WatchService("/region/")
+	tableSer := NewServiceDiscovery(endpoints) // 每个table的拥有对应table的region们地址
+	tableSer.WatchService("/table/")
+	defer regionSer.Close()
+	defer tableSer.Close()
+	//regionSer.WatchService("/web/")
+	//regionSer.WatchService("/gRPC/")
 	for {
 		select {
 		case <-time.Tick(5 * time.Second):
 			// TODO:维护regionStatus
 			// TODO:维护sortedRegions
-			regionCnt = len(ser.serverList) // update server count
-			log.Println(ser.GetServices())
+			regionCnt = len(regionSer.serverList) // update server count
+
+			log.Println(regionSer.GetServices())
 		}
 	}
 }

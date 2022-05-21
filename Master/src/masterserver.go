@@ -51,10 +51,18 @@ func initMaster() {
 
 }
 
+func domStr(IP string, port string, end bool) string {
+	if end {
+		return IP + ":" + port + ";"
+	} else {
+		return IP + ":" + port
+	}
+}
+
 func regionList(status []RegionStatus) string {
 	var ret string
 	for _, region := range status {
-		ret += region.regionIP + ":" + region.regionPort + ";"
+		ret += domStr(region.regionIP, region.regionPort, true)
 	}
 	return ret
 }
