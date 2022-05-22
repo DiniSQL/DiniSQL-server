@@ -110,57 +110,57 @@ func InitRegionServer() {
 	FlushChannel <- struct{}{} //开始刷新cache
 
 	// This part is for testing
-	op = "create table student2(id int, name char(12) unique, score float,primary key(id) );"
-	err = parser.Parse(strings.NewReader(op), StatementChannel)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(<-FinishChannel)
-	FlushChannel <- struct{}{} //开始刷新cache
+	// op = "create table student2(id int, name char(12) unique, score float,primary key(id) );"
+	// err = parser.Parse(strings.NewReader(op), StatementChannel)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// fmt.Println(<-FinishChannel)
+	// FlushChannel <- struct{}{} //开始刷新cache
 
-	op = "insert into student2 values(1080100001,'name1',99);"
-	err = parser.Parse(strings.NewReader(op), StatementChannel)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(<-FinishChannel)
-	FlushChannel <- struct{}{} //开始刷新cache
+	// op = "insert into student2 values(1080100001,'name1',99);"
+	// err = parser.Parse(strings.NewReader(op), StatementChannel)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// fmt.Println(<-FinishChannel)
+	// FlushChannel <- struct{}{} //开始刷新cache
 
-	op = "insert into student2 values(1080100002,'name2',77);"
-	err = parser.Parse(strings.NewReader(op), StatementChannel)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(<-FinishChannel)
-	FlushChannel <- struct{}{} //开始刷新cache
+	// op = "insert into student2 values(1080100002,'name2',77);"
+	// err = parser.Parse(strings.NewReader(op), StatementChannel)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// fmt.Println(<-FinishChannel)
+	// FlushChannel <- struct{}{} //开始刷新cache
 
-	op = "insert into student2 values(1080100003,'name3',44);"
-	err = parser.Parse(strings.NewReader(op), StatementChannel)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(<-FinishChannel)
-	FlushChannel <- struct{}{} //开始刷新cache
+	// op = "insert into student2 values(1080100003,'name3',44);"
+	// err = parser.Parse(strings.NewReader(op), StatementChannel)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// fmt.Println(<-FinishChannel)
+	// FlushChannel <- struct{}{} //开始刷新cache
 
-	op = "create index nameIndex on student2(name);"
-	err = parser.Parse(strings.NewReader(op), StatementChannel)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(<-FinishChannel)
-	FlushChannel <- struct{}{} //开始刷新cache
+	// op = "create index nameIndex on student2(name);"
+	// err = parser.Parse(strings.NewReader(op), StatementChannel)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// fmt.Println(<-FinishChannel)
+	// FlushChannel <- struct{}{} //开始刷新cache
 
 	listenFromClient(regionServer)
 }
 
 func listenFromClient(server *RegionServer) {
 	// This Upload is for testing
-	opRes, err := Upload("student2", "192.168.158.138:3036")
-	if err != nil {
-		fmt.Println(err)
-	}
+	// opRes, err := Upload("student2", "192.168.158.138:3036")
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
 
-	fmt.Println(opRes)
+	// fmt.Println(opRes)
 	listen, err := net.Listen("tcp", ":3037")
 	fmt.Println("Server started")
 	if err != nil {
