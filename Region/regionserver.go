@@ -39,8 +39,8 @@ func PeriodicallyFlush() {
 
 func InitRegionServer(ip string) {
 	var endpoints = []string{"127.0.0.1:2379"}
-	prefix := "/region"
-	key := strings.Join([]string{prefix, ip}, "/")
+	prefix := "/region/"
+	key := strings.Join([]string{prefix, ip, ":3037"}, "")
 	ser, err := NewServiceRegister(endpoints, key, "0", 5)
 	if err != nil {
 		log.Fatalln(err)
