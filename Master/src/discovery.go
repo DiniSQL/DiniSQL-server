@@ -26,7 +26,9 @@ type ServiceDiscovery struct {
 	lock          sync.Mutex
 }
 
-var endpoints = []string{"localhost:2379"}
+//var endpoints = []string{"localhost:2379"}
+
+var endpoints = []string{"192.168.84.244:2379"}
 var regionSer *ServiceDiscovery = NewServiceDiscovery(endpoints) // 每个region的IP:PORT和它对应的访问次数
 //var tableSer *ServiceDiscovery = NewServiceDiscovery(endpoints)  // 每个table的拥有对应table的region们地址
 
@@ -144,7 +146,7 @@ func (s *ServiceDiscovery) HandleRegionQuit(name string) {
 		targetRegion := domStr(regionSer.sortedRegions[0].regionIP, regionSer.sortedRegions[0].regionPort, true)
 		p := Type.Packet{}
 		p.Head = Type.PacketHead{P_Type: Type.UploadRegion, Op_Type: -1, Spare: ""}
-		p.Payload = []byte(srcRegion + ";" + table + ";" + targetRegion) // TODO: implement real payload
+		p.Payload = []byte(table + "," + targetRegion)
 		i, _ := strconv.Atoi(strings.Split(srcRegion, ":")[1])
 		address := net.TCPAddr{
 			IP:   net.ParseIP(strings.Split(srcRegion, ":")[0]),
@@ -211,6 +213,7 @@ func masterDiscovery() {
 	for {
 		select {
 		case <-time.Tick(5 * time.Second):
+			regionSer.regionCnt = len(regionSer.serverList)
 			log.Println("Region count: ", regionSer.regionCnt)
 			log.Println(regionSer.GetServices())
 		}

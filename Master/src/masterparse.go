@@ -12,7 +12,7 @@ import (
 func Parse2Statement(dataChannel <-chan types.DStatements, stopChannel chan<- string, tableChannel chan<- []string, stmtChannel chan<- types.DStatements) {
 	var _ Error.Error
 	for statement := range dataChannel {
-		fmt.Println(statement)
+		//fmt.Println("statement in Parse2Statement:", statement)
 		var ret string
 		stmtChannel <- statement
 		switch statement.GetOperationType() {
@@ -21,8 +21,8 @@ func Parse2Statement(dataChannel <-chan types.DStatements, stopChannel chan<- st
 		case types.UseDatabase:
 			fmt.Println("use database")
 		case types.CreateTable:
-			//fmt.Println("create table")
-			//fmt.Println(statement.(types.CreateTableStatement).TableName)
+			fmt.Println("create table")
+			fmt.Println(statement.(types.CreateTableStatement).TableName)
 			tableChannel <- []string{statement.(types.CreateTableStatement).TableName}
 
 		case types.CreateIndex:
@@ -53,6 +53,6 @@ func Parse2Statement(dataChannel <-chan types.DStatements, stopChannel chan<- st
 			//fmt.Println(err)
 			stopChannel <- ret
 		}
-		close(stopChannel)
+		//close(stopChannel)
 	}
 }

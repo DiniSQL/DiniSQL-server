@@ -6,9 +6,10 @@ import (
 	Type "DiniSQL/Region"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"github.com/tinylib/msgp/msgp"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -84,13 +85,23 @@ func findRelaxRegion(count int) string {
 		targetCount++
 
 	}
-
 	return ret
+}
 
+func findTargetRegion(IPList string) (IP string, Port string) {
+	Regions := strings.Split(IPList, ";")
+	lowestLoad := -1
+	for _, region := range Regions {
+		if regionSer.serverList[region] < lowestLoad || lowestLoad == -1 {
+			lowestLoad = regionSer.serverList[region]
+			IP, Port = strings.Split(region, ":")[0], strings.Split(region, ":")[1]
+		}
+	}
+	return
 }
 
 func ConnectToRegion(regionIP string, regionPort int, packet Type.Packet) (recPacket Type.Packet) {
-
+	// 找到负载最低的region并连接它
 	address := net.TCPAddr{
 		IP:   net.ParseIP(regionIP),
 		Port: regionPort,
@@ -101,28 +112,46 @@ func ConnectToRegion(regionIP string, regionPort int, packet Type.Packet) (recPa
 		log.Fatal(err) // Println + os.Exit(1)
 		return
 	}
-	var packetBuf = make([]byte, 0)
-	fmt.Printf("packet.Head.P_Type:%d\n", packet.Head.P_Type)
-	fmt.Printf("packet.Head.Op_Type:%d\n", packet.Head.Op_Type)
-	fmt.Printf("packet.Payload:%s\n", packet.Payload)
-	packetBuf, err = packet.MarshalMsg(packetBuf)
-	if err != nil {
-		log.Fatal(err) // Println + os.Exit(1)
-		return
-	}
-	_, err1 := conn.Write(packetBuf)
-	fmt.Println(packetBuf)
-	if err1 != nil {
-		log.Println(err)
-		conn.Close()
-		return
-	}
-	conn.Close()
+	rd := msgp.NewReader(conn)
+	wt := msgp.NewWriter(conn)
+	packet.EncodeMsg(wt)
+
+	//fmt.Printf("packet.Head.P_Type:%d\n", packet.Head.P_Type)
+	//fmt.Printf("packet.Head.Op_Type:%d\n", packet.Head.Op_Type)
+	//fmt.Printf("packet.Payload:%s\n", packet.Payload)
+
 	fmt.Printf("send %d to %s\n", packet.Head.P_Type, conn.RemoteAddr())
-	// listen after send
-	recPacket = HandleClient(ClientIP, ClientPort)
+
+	// 获取region的返回包
+	err = recPacket.DecodeMsg(rd)
+	conn.Close()
+
 	return
 
+}
+
+func SendToRegions(IPList string, packet Type.Packet) (recPacket Type.Packet) {
+	regions := strings.Split(IPList, ";")
+	finalStatus := true
+	finalResult := []byte{}
+	for _, region := range regions {
+		IP, Port := strings.Split(region, ":")[0], strings.Split(region, ":")[1]
+		p_int, err := strconv.Atoi(Port)
+		if err != nil {
+			return
+		}
+		recvPkt := ConnectToRegion(IP, p_int, packet)
+		finalStatus = recvPkt.Signal
+		finalResult = recvPkt.Payload
+		if finalStatus == false {
+			break
+		}
+	}
+	recPacket.Head = Type.PacketHead{P_Type: Type.Answer, Op_Type: 0, Spare: ""}
+	recPacket.Payload = finalResult
+	recPacket.Signal = finalStatus
+
+	return
 }
 
 func ConnectToClient(regionIP string, regionPort int, packet Type.Packet) (recPacket Type.Packet) {
@@ -162,56 +191,69 @@ func ConnectToClient(regionIP string, regionPort int, packet Type.Packet) (recPa
 
 }
 
-func CreatePacket(statement types.DStatements, tables []string) Type.Packet {
+func CreatePacket(statement types.DStatements, tables []string, SQLContent string) Type.Packet {
 	//regionSer.lock.Lock()
 	//defer regionSer.lock.Unlock()
-	packet := Type.Packet{}
-	packet.Head = Type.PacketHead{P_Type: Type.Answer, Op_Type: statement.GetOperationType(), Spare: ""}
-	var pay string
+	packetToClient := Type.Packet{}
+	packetToClient.Head = Type.PacketHead{P_Type: Type.Answer, Op_Type: statement.GetOperationType(), Spare: ""}
+
+	// 发给从节点对时候需要请求的是SQL的语句
+	packetToRegion := Type.Packet{}
+	packetToRegion.Head = Type.PacketHead{P_Type: Type.SQLOperation, Op_Type: statement.GetOperationType(), Spare: ""}
+	packetToRegion.Payload = []byte(SQLContent)
+	var IPResult string
+	recvResult := Type.Packet{}
+
+	IPResult = regionSer.tableList[tables[0]]
 	switch statement.GetOperationType() {
 	case types.CreateDatabase:
+
 	case types.UseDatabase:
 	case types.CreateTable:
 		selCnt := min(2, regionSer.regionCnt) // select specified number of regions
+		selCnt = 1                            // debug
+
 		if selCnt == 0 {
 			log.Fatal("no region available")
 		}
-		//selCnt = 2                              // debug
 		relaxRegions := findRelaxRegion(selCnt) //a.a.a:123;b.b.b:456;c.c.c:789;
 		fmt.Println("selected regions: ", relaxRegions)
-		pay = relaxRegions
-		//pay = regionList(relaxRegions)
+		IPResult = relaxRegions
+		//IPResult = regionList(relaxRegions)
 		//tab2reg[tables[0]] = relaxRegions
 		regionSer.tableList[tables[0]] = relaxRegions
-		regionSer.cli.Put(context.Background(), "/table/"+tables[0], pay)
+		regionSer.cli.Put(context.Background(), "/table/"+tables[0], IPResult)
 
 	case types.CreateIndex:
-		pay = regionSer.tableList[tables[0]]
+		recvResult = SendToRegions(IPResult, packetToRegion)
 
 	case types.DropTable:
-		pay = regionSer.tableList[tables[0]]
+		recvResult = SendToRegions(IPResult, packetToRegion)
 
 	case types.DropIndex:
-		pay = regionSer.tableList[tables[0]]
+		recvResult = SendToRegions(IPResult, packetToRegion)
 
 	case types.Insert:
-		pay = regionSer.tableList[tables[0]]
+		recvResult = SendToRegions(IPResult, packetToRegion)
 
 	case types.Update:
-		pay = regionSer.tableList[tables[0]]
+		recvResult = SendToRegions(IPResult, packetToRegion)
 
 	case types.Delete:
-		pay = regionSer.tableList[tables[0]]
+		recvResult = SendToRegions(IPResult, packetToRegion)
 
 	case types.Select:
-		pay = regionSer.tableList[tables[0]]
+		// select语句不需要发送到region
+		//recvResult = SendToRegions(IPResult, packetToRegion)
 
 	case types.ExecFile:
 	case types.DropDatabase:
 
 	}
-	packet.Payload = []byte(pay)
-	return packet
+	packetToClient.IPResult = []byte(IPResult)
+	packetToClient.Payload = []byte(recvResult.Payload)
+	//packetToClient.Payload = []byte("12345")
+	return packetToClient
 }
 
 func HandleClient(ClientIP string, ClientPort int) (receivedPacket Type.Packet) {
@@ -223,41 +265,45 @@ func HandleClient(ClientIP string, ClientPort int) (receivedPacket Type.Packet) 
 	}
 
 	conn, err := listener.Accept()
+	defer conn.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("remote connected! address:", conn.RemoteAddr())
-	res, err1 := ioutil.ReadAll(conn)
-	if err1 != nil {
-		log.Println(err)
-		conn.Close()
-	}
-	res, err1 = receivedPacket.UnmarshalMsg(res)
+	rd := msgp.NewReader(conn)
+	wt := msgp.NewWriter(conn)
+
+	err = receivedPacket.DecodeMsg(rd)
+	//res, err1 := ioutil.ReadAll(conn)
+	//if err1 != nil {
+	//	log.Println(err)
+	//	conn.Close()
+	//}
+	//res, err1 = receivedPacket.UnmarshalMsg(res)
 	// ch <- p
-	if err1 != nil {
-		log.Println(err)
-		conn.Close()
-	}
+	//if err1 != nil {
+	//	log.Println(err)
+	//	conn.Close()
+	//}
 
 	fmt.Printf("p.Head.P_Type:%d\n", receivedPacket.Head.P_Type)
 	fmt.Printf("p.Head.Op_Type:%d\n", receivedPacket.Head.Op_Type)
 	fmt.Printf("p.Payload:%s\n", receivedPacket.Payload)
+	SQLContent := string(receivedPacket.Payload)
+	go Parse2Statement(StatementChannel, FinishChannel, TablesChannel, OutputStatementChannel)
+
 	err = parser.Parse(strings.NewReader(string(receivedPacket.Payload)), StatementChannel) //收到客户端传过来的语句
 	if err != nil {
 		log.Fatal(err)
 	}
+	//close(StatementChannel) //关闭StatementChannel，进而关闭FinishChannel
+	//fmt.Println(<-OutputStatementChannel, <-TablesChannel)
+	statement := <-OutputStatementChannel
 	tabs := <-TablesChannel
-	statement := <-StatementChannel
 	fmt.Println("tabs:", tabs)
 
-	p := CreatePacket(statement, tabs)
-	packetBuf := make([]byte, 500)
-	packetBuf, err = p.MarshalMsg(packetBuf)
-	if err != nil {
-		log.Fatal(err) // Println + os.Exit(1)
-		return
-	}
-	_, err1 = conn.Write(packetBuf)
+	p := CreatePacket(statement, tabs, SQLContent)
+	p.EncodeMsg(wt)
 	//fmt.Printf("remote addr: %s\n", conn.RemoteAddr().String())
 	//remoteAddr := strings.Split(conn.RemoteAddr().String(), ":")
 	//ConnectToClient(remoteAddr[0], 8005, p)
@@ -272,35 +318,35 @@ func HandleClient(ClientIP string, ClientPort int) (receivedPacket Type.Packet) 
 func main() {
 	initMaster()
 
-	StatementChannel = make(chan types.DStatements, 500)
-	FinishChannel = make(chan string, 500)
-	TablesChannel = make(chan []string, 500)
-	OutputStatementChannel = make(chan types.DStatements, 500)
+	StatementChannel = make(chan types.DStatements, 0)
+	FinishChannel = make(chan string, 0)
+	TablesChannel = make(chan []string, 0)
+	OutputStatementChannel = make(chan types.DStatements, 0)
 	//FlushChannel := make(chan struct{})
-	go Parse2Statement(StatementChannel, FinishChannel, TablesChannel, OutputStatementChannel)
 	//fmt.Println("Initialized Master server")
-	var sql_strings = []string{
-		"create table tab1(a int);",
-		"select a from tab2;",
-	}
+	//var sql_strings = []string{
+	//	"create table tab1(a int);",
+	//	"select a from tab2;",
+	//}
 
-	err := parser.Parse(strings.NewReader(sql_strings[0]), StatementChannel) //开始解析
-	if err != nil {
-		log.Fatal(err)
-	}
-	go masterDiscovery()
-	//regionSer.serverList["127.0.0.1:1234"] = 0
-	//regionSer.serverList["127.0.0.2:1234"] = 1
-	//regionSer.serverList["127.0.0.3:1234"] = 0
-	CreatePacket(<-OutputStatementChannel, <-TablesChannel)
+	//err := parser.Parse(strings.NewReader(sql_strings[0]), StatementChannel) //开始解析
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//go masterDiscovery()
+	regionSer.serverList["127.0.0.1:1234"] = 0
+	regionSer.serverList["127.0.0.2:1234"] = 1
+	regionSer.serverList["127.0.0.3:1234"] = 0
+	//CreatePacket(<-OutputStatementChannel, <-TablesChannel, sql_strings[0])
+	//close(StatementChannel) //关闭StatementChannel，进而关闭FinishChannel
 	//fmt.Println(<-OutputStatementChannel, <-TablesChannel)
-	close(StatementChannel) //关闭StatementChannel，进而关闭FinishChannel
-	for _ = range FinishChannel {
 
-	}
 	for {
+		//fmt.Println(<-OutputStatementChannel, <-TablesChannel)
 		client := HandleClient(ClientIP, ClientPort)
 		fmt.Println(client)
 	}
-
+	//for _ = range FinishChannel {
+	//
+	//}
 }
