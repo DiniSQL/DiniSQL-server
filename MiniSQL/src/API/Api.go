@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -26,111 +27,90 @@ func HandleOneParse(dataChannel <-chan types.DStatements, stopChannel chan<- str
 		case types.CreateDatabase:
 
 			err = CreateDatabaseAPI(statement.(types.CreateDatabaseStatement))
-			if err.Status != true {
-				// fmt.Println(err.ErrorHint)
-				ret = fmt.Sprintln(err.ErrorHint)
+			if !err.Status {
+				ret = strings.Join([]string{"0", fmt.Sprintln(err.ErrorHint)}, "")
 			} else {
-				// fmt.Println("create datbase success.")
-				ret = fmt.Sprintf("create datbase success.")
+				ret = strings.Join([]string{"1", "create database success."}, "")
 			}
 
 		case types.UseDatabase:
 			err = UseDatabaseAPI(statement.(types.UseDatabaseStatement))
-			if err.Status != true {
-				// fmt.Println(err.ErrorHint)
-				ret = fmt.Sprintln(err.ErrorHint)
+			if !err.Status {
+				ret = strings.Join([]string{"0", fmt.Sprintln(err.ErrorHint)}, "")
 			} else {
-				// fmt.Printf("now you are using database.\n")
-				ret = fmt.Sprintf("now you are using database.")
+				ret = strings.Join([]string{"1", "use database success."}, "")
 			}
 
 		case types.CreateTable:
 			err = CreateTableAPI(statement.(types.CreateTableStatement))
-			if err.Status != true {
-				// fmt.Println(err.ErrorHint)
-				ret = fmt.Sprintln(err.ErrorHint)
+			if !err.Status {
+				ret = strings.Join([]string{"0", fmt.Sprintln(err.ErrorHint)}, "")
 			} else {
-				// fmt.Printf("create table succes.\n")
-				ret = fmt.Sprintf("create table succes.")
+				ret = strings.Join([]string{"1", "create table success."}, "")
 			}
 
 		case types.CreateIndex:
 			err = CreateIndexAPI(statement.(types.CreateIndexStatement))
-			if err.Status != true {
-				// fmt.Println(err.ErrorHint)
-				ret = fmt.Sprintln(err.ErrorHint)
+			if !err.Status {
+				ret = strings.Join([]string{"0", fmt.Sprintln(err.ErrorHint)}, "")
 			} else {
-				// fmt.Printf("create index succes.\n")
-				ret = fmt.Sprintf("create index succes.")
+				ret = strings.Join([]string{"1", "create index success."}, "")
 			}
 
 		case types.DropTable:
 			err = DropTableAPI(statement.(types.DropTableStatement))
-			if err.Status != true {
-				// fmt.Println(err.ErrorHint)
-				ret = fmt.Sprintln(err.ErrorHint)
+			if !err.Status {
+				ret = strings.Join([]string{"0", fmt.Sprintln(err.ErrorHint)}, "")
 			} else {
-				// fmt.Printf("drop table succes.\n")
-				ret = fmt.Sprintf("drop table succes.")
+				ret = strings.Join([]string{"1", "drop table success."}, "")
 			}
 
 		case types.DropIndex:
 			err = DropIndexAPI(statement.(types.DropIndexStatement))
-			if err.Status != true {
-				// fmt.Println(err.ErrorHint)
-				ret = fmt.Sprintln(err.ErrorHint)
+			if !err.Status {
+				ret = strings.Join([]string{"0", fmt.Sprintln(err.ErrorHint)}, "")
 			} else {
-				// fmt.Printf("drop index succes.\n")
-				ret = fmt.Sprintf("drop index succes.")
+				ret = strings.Join([]string{"1", "drop index success."}, "")
 			}
 
 		case types.DropDatabase:
 			err = DropDatabaseAPI(statement.(types.DropDatabaseStatement))
-			if err.Status != true {
-				// fmt.Println(err.ErrorHint)
-				ret = fmt.Sprintln(err.ErrorHint)
+			if !err.Status {
+				ret = strings.Join([]string{"0", fmt.Sprintln(err.ErrorHint)}, "")
 			} else {
-				// fmt.Printf("drop database succes.\n")
-				ret = fmt.Sprintf("drop database succes.")
+				ret = strings.Join([]string{"1", "drop database success."}, "")
 			}
 
 		case types.Insert:
 			err = InsertAPI(statement.(types.InsertStament))
-			if err.Status != true {
-				// fmt.Println(err.ErrorHint)
-				ret = fmt.Sprintln(err.ErrorHint)
+			if !err.Status {
+				ret = strings.Join([]string{"0", fmt.Sprintln(err.ErrorHint)}, "")
 			} else {
-				// fmt.Printf("insert success, 1 row affected.\n")
-				ret = fmt.Sprintf("insert success, 1 row affected.")
+				ret = strings.Join([]string{"1", "insert success."}, "")
 			}
 
 		case types.Update:
 			err = UpdateAPI(statement.(types.UpdateStament))
-			if err.Status != true {
-				// fmt.Println(err.ErrorHint)
-				ret = fmt.Sprintln(err.ErrorHint)
+			if !err.Status {
+				ret = strings.Join([]string{"0", fmt.Sprintln(err.ErrorHint)}, "")
 			} else {
-				// fmt.Printf("update success, %d rows are updated.\n", err.Rows)
-				ret = fmt.Sprintf("update success, %d rows are updated.", err.Rows)
+				ret = strings.Join([]string{"1", "update success."}, "")
 			}
 
 		case types.Delete:
 			err = DeleteAPI(statement.(types.DeleteStatement))
-			if err.Status != true {
-				// fmt.Println(err.ErrorHint)
-				ret = fmt.Sprintln(err.ErrorHint)
+			if !err.Status {
+				ret = strings.Join([]string{"0", fmt.Sprintln(err.ErrorHint)}, "")
 			} else {
-				// fmt.Printf("delete success, %d rows are deleted.\n", err.Rows)
-				ret = fmt.Sprintf("delete success, %d rows are deleted.", err.Rows)
+				ret = strings.Join([]string{"1", "delete success."}, "")
 			}
 
 		case types.Select:
 			err = SelectAPI(statement.(types.SelectStatement))
-			if err.Status != true {
-				// fmt.Println(err.ErrorHint)
-				ret = fmt.Sprintln(err.ErrorHint)
+			if !err.Status {
+				ret = strings.Join([]string{"0", fmt.Sprintln(err.ErrorHint)}, "")
 			} else {
-				ret = PrintTable(statement.(types.SelectStatement).TableNames[0], err.Data[err.Rows], err.Data[0:err.Rows]) //very dirty  but I have no other choose
+				ret = strings.Join([]string{"1", PrintTable(statement.(types.SelectStatement).TableNames[0], err.Data[err.Rows], err.Data[0:err.Rows])}, "")
 			}
 		case types.ExecFile:
 			err = ExecFileAPI(statement.(types.ExecFileStatement))
