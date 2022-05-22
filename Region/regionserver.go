@@ -37,37 +37,7 @@ func PeriodicallyFlush() {
 	MiniSQL.FlushALl()
 }
 
-// getLocalIpV4 获取 IPV4 IP，没有则返回空
-func getLocalIpV4(interfaceName string) (addr string, err error) {
-	inter, err := net.InterfaceByName(interfaceName)
-	if err != nil {
-		panic(err)
-	}
-	// 判断网卡是否开启，过滤本地环回接口
-	if inter.Flags&net.FlagUp != 0 && !strings.HasPrefix(inter.Name, "lo") {
-		// 获取网卡下所有的地址
-		addrs, err := inter.Addrs()
-		if err != nil {
-			panic(err)
-		}
-		for _, addr := range addrs {
-			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-				//判断是否存在IPV4 IP 如果没有过滤
-				if ipnet.IP.To4() != nil {
-					return ipnet.IP.String(), nil
-				}
-			}
-		}
-	}
-	return "", fmt.Errorf("interface %s don't have an ipv4 address", interfaceName)
-}
-
-func InitRegionServer() {
-	ip, err := getLocalIpV4("wifi0")
-	if err != nil {
-		log.Fatal(err)
-	}
-
+func InitRegionServer(ip string) {
 	var endpoints = []string{"127.0.0.1:2379"}
 	prefix := "/region"
 	key := strings.Join([]string{prefix, ip}, "/")

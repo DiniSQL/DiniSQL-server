@@ -2,10 +2,13 @@ package main
 
 import (
 	"DiniSQL/Region"
+	"fmt"
 )
 
 func main() {
-	Region.InitRegionServer()
+	var ip string
+	fmt.Scanln(&ip)
+	Region.InitRegionServer(ip)
 }
 
 // func main() {
