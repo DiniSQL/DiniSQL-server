@@ -1,6 +1,7 @@
 package Region
 
 import (
+	"DiniSQL/MiniSQL"
 	"DiniSQL/MiniSQL/src/API"
 	"DiniSQL/MiniSQL/src/BufferManager"
 	"DiniSQL/MiniSQL/src/CatalogManager"
@@ -30,6 +31,7 @@ type RegionServer struct {
 	tables     []string
 	serverID   int
 	visitCount int
+	register   *ServiceRegister
 }
 
 func FlushALl() {
@@ -43,10 +45,55 @@ func PeriodicallyFlush() {
 	FlushALl()
 }
 
+// getLocalIpV4 获取 IPV4 IP，没有则返回空
+func getLocalIpV4(interfaceName string) (addr string, err error) {
+	inter, err := net.InterfaceByName(interfaceName)
+	if err != nil {
+		panic(err)
+	}
+	// 判断网卡是否开启，过滤本地环回接口
+	if inter.Flags&net.FlagUp != 0 && !strings.HasPrefix(inter.Name, "lo") {
+		// 获取网卡下所有的地址
+		addrs, err := inter.Addrs()
+		if err != nil {
+			panic(err)
+		}
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				//判断是否存在IPV4 IP 如果没有过滤
+				if ipnet.IP.To4() != nil {
+					return ipnet.IP.String(), nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("interface %s don't have an ipv4 address", interfaceName)
+}
+
 func InitRegionServer() {
+	ip, err := getLocalIpV4("wifi0")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var endpoints = []string{"127.0.0.1:2379"}
+	prefix := "/region"
+	key := strings.Join([]string{prefix, ip}, "/")
+	ser, err := NewServiceRegister(endpoints, key, "0", 5)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	//监听续租相应chan
+	go ser.ListenLeaseRespChan()
+
 	regionServer = new(RegionServer)
 	regionServer.visitCount = 0
 	regionServer.tables = []string{}
+	regionServer.register = ser
+
+	MiniSQL.InitDB()
+
 	StatementChannel = make(chan types.DStatements, 500)   //用于传输操作指令通道
 	FinishChannel = make(chan string, 500)                 //用于api执行完成反馈通道
 	FlushChannel = make(chan struct{})                     //用于每条指令结束后协程flush
@@ -55,7 +102,7 @@ func InitRegionServer() {
 	go PeriodicallyFlush()
 
 	op := "create database " + databaseName + ";"
-	err := parser.Parse(strings.NewReader(op), StatementChannel)
+	err = parser.Parse(strings.NewReader(op), StatementChannel)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -140,6 +187,7 @@ func byteSliceToString(bytes []byte) string {
 func (server *RegionServer) serve(conn net.Conn) {
 	defer conn.Close()
 	server.visitCount++
+	server.register.UpdateKey(fmt.Sprint(server.visitCount))
 
 	var p Packet
 	rd := msgp.NewReader(conn)
