@@ -4,6 +4,7 @@ import (
 	"DiniSQL/MiniSQL/src/Interpreter/parser"
 	"DiniSQL/MiniSQL/src/Interpreter/types"
 	Type "DiniSQL/Region"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -16,27 +17,75 @@ type RegionStatus struct {
 	regionPort string
 	regionID   int
 	rawStatus  string
-	lastConn   int64
+	firstConn  string
 	surviving  bool
-	loadLevel  int
 }
 
 const (
 	MASTER_PORT = ":9000"
 	ClientIP    = "127.0.0.1"
-	ClientPort  = 6100
+	ClientPort  = 9000
 )
 
-var tab2reg map[string]*RegionStatus
-var id2reg map[int]*RegionStatus
+var tab2reg map[string][]RegionStatus
+
+var StatementChannel chan types.DStatements
+var FinishChannel chan string
+var TablesChannel chan []string
+var OutputStatementChannel chan types.DStatements
+
+//var regionStatus map[string]*RegionStatus // region name to region status
+
+//var StatementChannel = make(chan types.DStatements, 500)
 
 func initMaster() {
 	// Initialize the master server
-	tab2reg = make(map[string]*RegionStatus) // table name to region status
-	tab2reg["foo"] = new(RegionStatus)
-	id2reg = make(map[int]*RegionStatus) // region id to region status
-	id2reg[0] = new(RegionStatus)
-	id2reg[0].regionID = 1
+	tab2reg = make(map[string][]RegionStatus) // table name to region status
+	tab2reg["foo"] = append(tab2reg["foo"], RegionStatus{})
+	//id2reg = make(map[int]*RegionStatus) // region id to region status
+	//id2reg[0] = new(RegionStatus)
+	//id2reg[0].regionID = 1
+
+}
+
+func domStr(IP string, port string, end bool) string {
+	if end {
+		return IP + ":" + port + ";"
+	} else {
+		return IP + ":" + port
+	}
+}
+
+func regionList(status []RegionStatus) string {
+	var ret string
+	for _, region := range status {
+		ret += domStr(region.regionIP, region.regionPort, true)
+	}
+	return ret
+}
+
+func findRelaxRegion(count int) string {
+	var ret string
+	selectedRegion := 0
+	targetCount := 0 // 当前遍历到的访问次数，从最低的0开始
+	// 假设我们所需的服务器数量count永远能小于总连接的region
+	for {
+		if selectedRegion >= count {
+			break
+		}
+		for region, currentCount := range regionSer.serverList {
+			fmt.Println("region:", region, "currentCount:", currentCount)
+			if targetCount == currentCount {
+				ret += region + ";"
+				selectedRegion++
+			}
+		}
+		// 每个循环中，所寻找的指定访问次数++
+		targetCount++
+
+	}
+
+	return ret
 
 }
 
@@ -71,7 +120,7 @@ func ConnectToRegion(regionIP string, regionPort int, packet Type.Packet) (recPa
 	conn.Close()
 	fmt.Printf("send %d to %s\n", packet.Head.P_Type, conn.RemoteAddr())
 	// listen after send
-	recPacket = KeepListening(ClientIP, ClientPort)
+	recPacket = HandleClient(ClientIP, ClientPort)
 	return
 
 }
@@ -108,14 +157,64 @@ func ConnectToClient(regionIP string, regionPort int, packet Type.Packet) (recPa
 	conn.Close()
 	fmt.Printf("send %d to %s\n", packet.Head.P_Type, conn.RemoteAddr())
 	// listen after send
-	//recPacket = KeepListening(ClientIP, ClientPort)
+	//recPacket = HandleClient(ClientIP, ClientPort)
 	return
 
 }
 
-// listen
-// input : IP and Port of client
-func KeepListening(ClientIP string, ClientPort int) (receivedPacket Type.Packet) {
+func CreatePacket(statement types.DStatements, tables []string) Type.Packet {
+	//regionSer.lock.Lock()
+	//defer regionSer.lock.Unlock()
+	packet := Type.Packet{}
+	packet.Head = Type.PacketHead{P_Type: Type.Answer, Op_Type: statement.GetOperationType(), Spare: ""}
+	var pay string
+	switch statement.GetOperationType() {
+	case types.CreateDatabase:
+	case types.UseDatabase:
+	case types.CreateTable:
+		selCnt := min(2, regionSer.regionCnt) // select specified number of regions
+		if selCnt == 0 {
+			log.Fatal("no region available")
+		}
+		//selCnt = 2                              // debug
+		relaxRegions := findRelaxRegion(selCnt) //a.a.a:123;b.b.b:456;c.c.c:789;
+		fmt.Println("selected regions: ", relaxRegions)
+		pay = relaxRegions
+		//pay = regionList(relaxRegions)
+		//tab2reg[tables[0]] = relaxRegions
+		regionSer.tableList[tables[0]] = relaxRegions
+		regionSer.cli.Put(context.Background(), "/table/"+tables[0], pay)
+
+	case types.CreateIndex:
+		pay = regionSer.tableList[tables[0]]
+
+	case types.DropTable:
+		pay = regionSer.tableList[tables[0]]
+
+	case types.DropIndex:
+		pay = regionSer.tableList[tables[0]]
+
+	case types.Insert:
+		pay = regionSer.tableList[tables[0]]
+
+	case types.Update:
+		pay = regionSer.tableList[tables[0]]
+
+	case types.Delete:
+		pay = regionSer.tableList[tables[0]]
+
+	case types.Select:
+		pay = regionSer.tableList[tables[0]]
+
+	case types.ExecFile:
+	case types.DropDatabase:
+
+	}
+	packet.Payload = []byte(pay)
+	return packet
+}
+
+func HandleClient(ClientIP string, ClientPort int) (receivedPacket Type.Packet) {
 	fmt.Println("listening...")
 	listener, err := net.Listen("tcp", MASTER_PORT)
 	defer listener.Close()
@@ -127,7 +226,7 @@ func KeepListening(ClientIP string, ClientPort int) (receivedPacket Type.Packet)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("remote address:", conn.RemoteAddr())
+	fmt.Println("remote connected! address:", conn.RemoteAddr())
 	res, err1 := ioutil.ReadAll(conn)
 	if err1 != nil {
 		log.Println(err)
@@ -143,9 +242,22 @@ func KeepListening(ClientIP string, ClientPort int) (receivedPacket Type.Packet)
 	fmt.Printf("p.Head.P_Type:%d\n", receivedPacket.Head.P_Type)
 	fmt.Printf("p.Head.Op_Type:%d\n", receivedPacket.Head.Op_Type)
 	fmt.Printf("p.Payload:%s\n", receivedPacket.Payload)
+	err = parser.Parse(strings.NewReader(string(receivedPacket.Payload)), StatementChannel) //收到客户端传过来的语句
+	if err != nil {
+		log.Fatal(err)
+	}
+	tabs := <-TablesChannel
+	statement := <-StatementChannel
+	fmt.Println("tabs:", tabs)
 
-	//p := Type.Packet{Head: Type.PacketHead{P_Type: Type.KeepAlive, Op_Type: Type.CreateIndex},
-	//	Payload: []byte("foo")}
+	p := CreatePacket(statement, tabs)
+	packetBuf := make([]byte, 500)
+	packetBuf, err = p.MarshalMsg(packetBuf)
+	if err != nil {
+		log.Fatal(err) // Println + os.Exit(1)
+		return
+	}
+	_, err1 = conn.Write(packetBuf)
 	//fmt.Printf("remote addr: %s\n", conn.RemoteAddr().String())
 	//remoteAddr := strings.Split(conn.RemoteAddr().String(), ":")
 	//ConnectToClient(remoteAddr[0], 8005, p)
@@ -154,17 +266,18 @@ func KeepListening(ClientIP string, ClientPort int) (receivedPacket Type.Packet)
 
 }
 
+// 监听client的连接，当某个client连接上之后，处理其连接，等待请求的表的信息，获取表名之后将对应的Region地址返回给client
+// 如果是创建新表，需要选择一个region，通知region新建表项
+// 对于不同的
 func main() {
 	initMaster()
-	//reader, err := os.Open("1.txt")
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	StatementChannel := make(chan types.DStatements, 500)
-	FinishChannel := make(chan string, 500)
-	TablesChannel := make(chan []string, 500)
+
+	StatementChannel = make(chan types.DStatements, 500)
+	FinishChannel = make(chan string, 500)
+	TablesChannel = make(chan []string, 500)
+	OutputStatementChannel = make(chan types.DStatements, 500)
 	//FlushChannel := make(chan struct{})
-	go Parse2Statement(StatementChannel, FinishChannel, TablesChannel)
+	go Parse2Statement(StatementChannel, FinishChannel, TablesChannel, OutputStatementChannel)
 	//fmt.Println("Initialized Master server")
 	var sql_strings = []string{
 		"create table tab1(a int);",
@@ -175,16 +288,19 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(<-TablesChannel)
+	go masterDiscovery()
+	//regionSer.serverList["127.0.0.1:1234"] = 0
+	//regionSer.serverList["127.0.0.2:1234"] = 1
+	//regionSer.serverList["127.0.0.3:1234"] = 0
+	CreatePacket(<-OutputStatementChannel, <-TablesChannel)
+	//fmt.Println(<-OutputStatementChannel, <-TablesChannel)
 	close(StatementChannel) //关闭StatementChannel，进而关闭FinishChannel
 	for _ = range FinishChannel {
 
 	}
 	for {
-		client := KeepListening(ClientIP, 9000)
+		client := HandleClient(ClientIP, ClientPort)
 		fmt.Println(client)
-
-		//ConnectToRegion("127.0.0.1", 8006, p)
 	}
 
 }

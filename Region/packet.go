@@ -13,6 +13,8 @@ type PacketHead struct {
 }
 
 type Packet struct {
-	Head    PacketHead
-	Payload []byte
+	Head     PacketHead
+	Signal   bool
+	Payload  []byte
+	IPResult []byte
 }

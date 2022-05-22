@@ -42,7 +42,7 @@ func NewServiceRegister(endpoints []string, key, val string, lease int64) (*Serv
 	return ser, nil
 }
 
-//设置租约
+//putKeyWithLease 设置租约
 func (s *ServiceRegister) putKeyWithLease(lease int64) error {
 	//设置租约时间
 	resp, err := s.cli.Grant(context.Background(), lease)
@@ -63,7 +63,18 @@ func (s *ServiceRegister) putKeyWithLease(lease int64) error {
 	s.leaseID = resp.ID
 	log.Println(s.leaseID)
 	s.keepAliveChan = leaseRespChan
-	log.Printf("Put key:%s  val:%s  success!", s.key, s.val)
+	log.Printf("Put key:%s val:%s success!", s.key, s.val)
+	return nil
+}
+
+//UpdateKey 更新服务
+func (s *ServiceRegister) UpdateKey(val string) error {
+	s.val = val
+	_, err := s.cli.Put(context.Background(), s.key, s.val, clientv3.WithLease(s.leaseID))
+	if err != nil {
+		return err
+	}
+	log.Printf("Update key:%s  val:%s success!", s.key, s.val)
 	return nil
 }
 
