@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
-	"sort"
 	"strings"
 )
 
@@ -17,9 +16,8 @@ type RegionStatus struct {
 	regionPort string
 	regionID   int
 	rawStatus  string
-	lastConn   int64
+	firstConn  string
 	surviving  bool
-	loadLevel  int
 }
 
 const (
@@ -29,14 +27,13 @@ const (
 )
 
 var tab2reg map[string][]RegionStatus
-var id2reg map[int]*RegionStatus
-var regionCnt int
+
 var StatementChannel chan types.DStatements
 var FinishChannel chan string
 var TablesChannel chan []string
+var OutputStatementChannel chan types.DStatements
 
-var regionStatus map[string]*RegionStatus // region name to region status
-var sortedRegions []RegionStatus
+//var regionStatus map[string]*RegionStatus // region name to region status
 
 //var StatementChannel = make(chan types.DStatements, 500)
 
@@ -44,10 +41,10 @@ func initMaster() {
 	// Initialize the master server
 	tab2reg = make(map[string][]RegionStatus) // table name to region status
 	tab2reg["foo"] = append(tab2reg["foo"], RegionStatus{})
-	regionCnt = 0
-	id2reg = make(map[int]*RegionStatus) // region id to region status
-	id2reg[0] = new(RegionStatus)
-	id2reg[0].regionID = 1
+	regionSer.regionCnt = 0
+	//id2reg = make(map[int]*RegionStatus) // region id to region status
+	//id2reg[0] = new(RegionStatus)
+	//id2reg[0].regionID = 1
 
 }
 
@@ -67,17 +64,27 @@ func regionList(status []RegionStatus) string {
 	return ret
 }
 
-func findRelaxRegion(count int) []RegionStatus {
-	var relaxRegions []RegionStatus
-	sort.Slice(sortedRegions, func(i, j int) bool {
-		return sortedRegions[i].loadLevel < sortedRegions[j].loadLevel
-	})
-	for idx, region := range sortedRegions {
-		if count <= idx {
-			relaxRegions = append(relaxRegions, region)
+func findRelaxRegion(count int) string {
+	var ret string
+	selectedRegion := 0
+	targetCount := 0 // 当前遍历到的访问次数，从最低的0开始
+	// 假设我们所需的服务器数量count永远能小于总连接的region
+	for {
+		if selectedRegion >= count {
+			break
 		}
+		for region, currentCount := range regionSer.serverList {
+			if targetCount == currentCount {
+				ret += region + ";"
+				selectedRegion++
+			}
+		}
+		// 每个循环中，所寻找的指定访问次数++
+		targetCount++
+
 	}
-	return relaxRegions
+
+	return ret
 
 }
 
@@ -162,39 +169,33 @@ func CreatePacket(statement types.DStatements, tables []string) Type.Packet {
 	case types.CreateDatabase:
 	case types.UseDatabase:
 	case types.CreateTable:
-		selCnt := min(3, regionCnt) // select specified number of regions
-		relaxRegions := findRelaxRegion(selCnt)
-		pay = regionList(relaxRegions)
-		tab2reg[tables[0]] = relaxRegions
-		tableSer.tableList[tables[0]] = regionList(relaxRegions)
+		selCnt := min(2, regionSer.regionCnt)   // select specified number of regions
+		relaxRegions := findRelaxRegion(selCnt) //a.a.a:123;b.b.b:456;c.c.c:789;
+		pay = relaxRegions
+		//pay = regionList(relaxRegions)
+		//tab2reg[tables[0]] = relaxRegions
+		regionSer.tableList[tables[0]] = relaxRegions
 
 	case types.CreateIndex:
-		regions := tab2reg[tables[0]]
-		pay = regionList(regions)
+		pay = regionSer.tableList[tables[0]]
 
 	case types.DropTable:
-		regions := tab2reg[tables[0]]
-		pay = regionList(regions)
+		pay = regionSer.tableList[tables[0]]
 
 	case types.DropIndex:
-		regions := tab2reg[tables[0]]
-		pay = regionList(regions)
+		pay = regionSer.tableList[tables[0]]
 
 	case types.Insert:
-		regions := tab2reg[tables[0]]
-		pay = regionList(regions)
+		pay = regionSer.tableList[tables[0]]
 
 	case types.Update:
-		regions := tab2reg[tables[0]]
-		pay = regionList(regions)
+		pay = regionSer.tableList[tables[0]]
 
 	case types.Delete:
-		regions := tab2reg[tables[0]]
-		pay = regionList(regions)
+		pay = regionSer.tableList[tables[0]]
 
 	case types.Select:
-		regions := tab2reg[tables[0]]
-		pay = regionList(regions)
+		pay = regionSer.tableList[tables[0]]
 
 	case types.ExecFile:
 	case types.DropDatabase:
@@ -265,8 +266,9 @@ func main() {
 	StatementChannel = make(chan types.DStatements, 500)
 	FinishChannel = make(chan string, 500)
 	TablesChannel = make(chan []string, 500)
+	OutputStatementChannel = make(chan types.DStatements, 500)
 	//FlushChannel := make(chan struct{})
-	go Parse2Statement(StatementChannel, FinishChannel, TablesChannel)
+	go Parse2Statement(StatementChannel, FinishChannel, TablesChannel, OutputStatementChannel)
 	//fmt.Println("Initialized Master server")
 	var sql_strings = []string{
 		"create table tab1(a int);",
@@ -277,7 +279,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(<-TablesChannel)
+	go masterDiscovery()
+	//CreatePacket(<-OutputStatementChannel, <-TablesChannel)
+	//fmt.Println(<-OutputStatementChannel, <-TablesChannel)
 	close(StatementChannel) //关闭StatementChannel，进而关闭FinishChannel
 	for _ = range FinishChannel {
 
@@ -285,8 +289,6 @@ func main() {
 	for {
 		client := HandleClient(ClientIP, 9000)
 		fmt.Println(client)
-
-		//ConnectToRegion("127.0.0.1", 8006, p)
 	}
 
 }
