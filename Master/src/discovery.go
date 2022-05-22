@@ -43,6 +43,8 @@ func NewServiceDiscovery(endpoints []string) *ServiceDiscovery {
 	return &ServiceDiscovery{
 		cli:        cli,
 		serverList: make(map[string]int),
+		tableList:  make(map[string]string),
+		regionCnt:  0,
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"DiniSQL/MiniSQL/src/Interpreter/parser"
 	"DiniSQL/MiniSQL/src/Interpreter/types"
 	Type "DiniSQL/Region"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -23,7 +24,7 @@ type RegionStatus struct {
 const (
 	MASTER_PORT = ":9000"
 	ClientIP    = "127.0.0.1"
-	ClientPort  = 6100
+	ClientPort  = 9000
 )
 
 var tab2reg map[string][]RegionStatus
@@ -41,7 +42,6 @@ func initMaster() {
 	// Initialize the master server
 	tab2reg = make(map[string][]RegionStatus) // table name to region status
 	tab2reg["foo"] = append(tab2reg["foo"], RegionStatus{})
-	regionSer.regionCnt = 0
 	//id2reg = make(map[int]*RegionStatus) // region id to region status
 	//id2reg[0] = new(RegionStatus)
 	//id2reg[0].regionID = 1
@@ -74,6 +74,7 @@ func findRelaxRegion(count int) string {
 			break
 		}
 		for region, currentCount := range regionSer.serverList {
+			fmt.Println("region:", region, "currentCount:", currentCount)
 			if targetCount == currentCount {
 				ret += region + ";"
 				selectedRegion++
@@ -162,6 +163,8 @@ func ConnectToClient(regionIP string, regionPort int, packet Type.Packet) (recPa
 }
 
 func CreatePacket(statement types.DStatements, tables []string) Type.Packet {
+	//regionSer.lock.Lock()
+	//defer regionSer.lock.Unlock()
 	packet := Type.Packet{}
 	packet.Head = Type.PacketHead{P_Type: Type.Answer, Op_Type: statement.GetOperationType(), Spare: ""}
 	var pay string
@@ -169,12 +172,18 @@ func CreatePacket(statement types.DStatements, tables []string) Type.Packet {
 	case types.CreateDatabase:
 	case types.UseDatabase:
 	case types.CreateTable:
-		selCnt := min(2, regionSer.regionCnt)   // select specified number of regions
+		selCnt := min(2, regionSer.regionCnt) // select specified number of regions
+		if selCnt == 0 {
+			log.Fatal("no region available")
+		}
+		//selCnt = 2                              // debug
 		relaxRegions := findRelaxRegion(selCnt) //a.a.a:123;b.b.b:456;c.c.c:789;
+		fmt.Println("selected regions: ", relaxRegions)
 		pay = relaxRegions
 		//pay = regionList(relaxRegions)
 		//tab2reg[tables[0]] = relaxRegions
 		regionSer.tableList[tables[0]] = relaxRegions
+		regionSer.cli.Put(context.Background(), "/table/"+tables[0], pay)
 
 	case types.CreateIndex:
 		pay = regionSer.tableList[tables[0]]
@@ -280,14 +289,17 @@ func main() {
 		log.Fatal(err)
 	}
 	go masterDiscovery()
-	//CreatePacket(<-OutputStatementChannel, <-TablesChannel)
+	//regionSer.serverList["127.0.0.1:1234"] = 0
+	//regionSer.serverList["127.0.0.2:1234"] = 1
+	//regionSer.serverList["127.0.0.3:1234"] = 0
+	CreatePacket(<-OutputStatementChannel, <-TablesChannel)
 	//fmt.Println(<-OutputStatementChannel, <-TablesChannel)
 	close(StatementChannel) //关闭StatementChannel，进而关闭FinishChannel
 	for _ = range FinishChannel {
 
 	}
 	for {
-		client := HandleClient(ClientIP, 9000)
+		client := HandleClient(ClientIP, ClientPort)
 		fmt.Println(client)
 	}
 
