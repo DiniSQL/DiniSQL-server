@@ -7,7 +7,6 @@ import (
 	"DiniSQL/MiniSQL/src/CatalogManager"
 	"DiniSQL/MiniSQL/src/Interpreter/parser"
 	"DiniSQL/MiniSQL/src/Interpreter/types"
-	"DiniSQL/MiniSQL/src/RecordManager"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -29,20 +28,13 @@ var FlushChannel chan struct{}
 
 type RegionServer struct {
 	tables     []string
-	serverID   int
 	visitCount int
 	register   *ServiceRegister
 }
 
-func FlushALl() {
-	BufferManager.BlockFlushAll()                                             //缓存block
-	RecordManager.FlushFreeList()                                             //free list写回
-	CatalogManager.FlushDatabaseMeta(CatalogManager.UsingDatabase.DatabaseId) //刷新记录长度和余量
-}
-
 func PeriodicallyFlush() {
 	time.Sleep(60 * 5 * time.Second)
-	FlushALl()
+	MiniSQL.FlushALl()
 }
 
 // getLocalIpV4 获取 IPV4 IP，没有则返回空
@@ -135,27 +127,6 @@ func InitRegionServer() {
 	FlushChannel <- struct{}{} //开始刷新cache
 
 	listenFromClient(regionServer)
-}
-
-func (server *RegionServer) heartBeat(conn net.Conn) {
-	for {
-		time.Sleep(5 * time.Second)
-		str := fmt.Sprintf("ServerID:%d", server.serverID)
-		//h := HeartBeat2etcd{serverID: server.serverID, regions: regions}
-		p := Packet{
-			Head: PacketHead{
-				P_Type:  KeepAlive,
-				Op_Type: -1,
-			},
-			Payload: []byte(str),
-		}
-		var replyBuf = make([]byte, p.Msgsize())
-		replyBuf, err := p.MarshalMsg(replyBuf)
-		if err != nil {
-			fmt.Println(err)
-		}
-		conn.Write(replyBuf)
-	}
 }
 
 func listenFromClient(server *RegionServer) {
