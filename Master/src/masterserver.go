@@ -6,6 +6,7 @@ import (
 	Type "DiniSQL/Region"
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"strings"
@@ -80,6 +81,9 @@ func findRelaxRegion(count int) string {
 				ret += region + ";"
 				selectedRegion++
 			}
+			if selectedRegion >= count {
+				break
+			}
 		}
 		// 每个循环中，所寻找的指定访问次数++
 		targetCount++
@@ -118,9 +122,18 @@ func ConnectToRegion(regionIP string, regionPort string, packet Type.Packet) (re
 		log.Fatal(err) // Println + os.Exit(1)
 		return
 	}
-	rd := msgp.NewReader(conn)
-	wt := msgp.NewWriter(conn)
-	err = packet.EncodeMsg(wt)
+	//rd := msgp.NewReader(conn)
+	packet.IPResult = make([]byte, 0)
+
+	//wt := msgp.NewWriter(conn)
+	if err != nil {
+		log.Println(err)
+	}
+
+	var packetBuf = make([]byte, 0)
+	packetBuf, err = packet.MarshalMsg(packetBuf)
+	_, err = conn.Write(packetBuf)
+	//err = packet.EncodeMsg(wt)
 	if err != nil {
 		log.Println(err)
 	}
@@ -132,7 +145,18 @@ func ConnectToRegion(regionIP string, regionPort string, packet Type.Packet) (re
 	fmt.Printf("send %d to %s\n", packet.Head.P_Type, conn.RemoteAddr())
 
 	// 获取region的返回包
-	err = recPacket.DecodeMsg(rd)
+	//err = recPacket.DecodeMsg(rd)
+	packetBuf, err = ioutil.ReadAll(conn)
+	//for {
+	//	if len(packetBuf) != 0 {
+	//		break
+	//	}
+	//
+	//}
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = recPacket.UnmarshalMsg(packetBuf)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -145,7 +169,7 @@ func SendToRegions(IPList string, packet Type.Packet) (recPacket Type.Packet) {
 	regions := strings.Split(IPList, ";")
 	finalStatus := true
 	var finalResult []byte
-	for _, region := range regions {
+	for _, region := range regions[:len(regions)-1] {
 		IP, Port := strings.Split(region, ":")[0], strings.Split(region, ":")[1]
 		//p_int, err := strconv.Atoi(Port)
 		//if err != nil {
@@ -222,7 +246,7 @@ func CreatePacket(statement types.DStatements, tables []string, SQLContent strin
 	case types.UseDatabase:
 	case types.CreateTable:
 		selCnt := min(2, regionSer.regionCnt) // select specified number of regions
-		selCnt = 1                            // debug
+		selCnt = 2                            // debug
 
 		if selCnt == 0 {
 			log.Fatal("no region available")
@@ -241,6 +265,12 @@ func CreatePacket(statement types.DStatements, tables []string, SQLContent strin
 
 	case types.DropTable:
 		recvResult = SendToRegions(IPResult, packetToRegion)
+		regionSer.cli.Delete(context.Background(), "/table/"+tables[0])
+		delete(regionSer.tableList, tables[0])
+		//oldRegions := regionSer.tableList[tables[0]]
+		//oldRegions = strings.Replace(oldRegions, region+";", "", 1)
+		//regionSer.tableList[tables[0]] = oldRegions
+		//regionSer.cli.Put(context.Background(), "/table/"+tableName, regions)
 
 	case types.DropIndex:
 		recvResult = SendToRegions(IPResult, packetToRegion)
@@ -264,6 +294,10 @@ func CreatePacket(statement types.DStatements, tables []string, SQLContent strin
 	}
 	packetToClient.IPResult = []byte(IPResult)
 	packetToClient.Payload = []byte(recvResult.Payload)
+	packetToClient.Signal = recvResult.Signal
+	if statement.GetOperationType() == types.Select {
+		packetToClient.Signal = true
+	}
 	//packetToClient.Payload = []byte("12345")
 	return packetToClient
 }
@@ -276,7 +310,7 @@ func HandleClient(ClientIP string, ClientPort int, listener net.Listener) (recei
 	defer conn.Close()
 	fmt.Println("remote connected! address:", conn.RemoteAddr())
 	rd := msgp.NewReader(conn)
-	wt := msgp.NewWriter(conn)
+	//wt := msgp.NewWriter(conn)
 
 	err = receivedPacket.DecodeMsg(rd)
 	if err != nil {
@@ -310,10 +344,20 @@ func HandleClient(ClientIP string, ClientPort int, listener net.Listener) (recei
 	fmt.Println("tabs:", tabs)
 
 	p := CreatePacket(statement, tabs, SQLContent)
-	p.EncodeMsg(wt)
-	//fmt.Printf("remote addr: %s\n", conn.RemoteAddr().String())
-	//remoteAddr := strings.Split(conn.RemoteAddr().String(), ":")
-	//ConnectToClient(remoteAddr[0], 8005, p)
+	var packetBuf = make([]byte, 0)
+	//fmt.Printf("packet.Head.P_Type:%d\n", packet.Head.P_Type)
+	//fmt.Printf("packet.Head.Op_Type:%d\n", packet.Head.Op_Type)
+	//fmt.Printf("packet.Payload:%s\n", packet.Payload)
+	packetBuf, err = p.MarshalMsg(packetBuf)
+	if err != nil {
+		log.Fatal(err) // Println + os.Exit(1)
+		return
+	}
+	_, err = conn.Write(packetBuf)
+	//err := p.EncodeMsg(wt)
+	if err != nil {
+		return Type.Packet{}
+	}
 
 	return
 
