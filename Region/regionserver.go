@@ -161,7 +161,7 @@ func (server *RegionServer) serve(conn net.Conn) {
 
 	var p Packet
 	rd := msgp.NewReader(conn)
-	wt := msgp.NewWriter(conn)
+	// wt := msgp.NewWriter(conn)
 
 	err := p.DecodeMsg(rd)
 	if err != nil {
@@ -182,7 +182,9 @@ func (server *RegionServer) serve(conn net.Conn) {
 			Signal:  opRes[0] == '1',
 			Payload: []byte(opRes[1:]),
 		}
-		replyPacket.EncodeMsg(wt)
+		buf := make([]byte, 0)
+		buf, err = replyPacket.MarshalMsg(buf)
+		conn.Write(buf)
 		if err != nil {
 			fmt.Println("Error: conn.Write()")
 		}
