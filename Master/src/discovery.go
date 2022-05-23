@@ -4,6 +4,7 @@ import (
 	Type "DiniSQL/Region"
 	"context"
 	"fmt"
+	"github.com/tinylib/msgp/msgp"
 	"log"
 	"math/rand"
 	"net"
@@ -133,39 +134,72 @@ func (s *ServiceDiscovery) DelServiceList(key string) {
 	}
 }
 
+func (s *ServiceDiscovery) regionToTables(region string) ([]string, error) {
+	var tables []string
+	for tableName, regions := range s.tableList {
+		if strings.Contains(regions, region) {
+			tables = append(tables, tableName)
+		}
+	}
+	return tables, nil
+}
+
+// deleteTableNames 更新tableList中已经丢失的region的信息
+func (s *ServiceDiscovery) deleteTableNames(tableNames []string, region string) error {
+
+	for _, tableName := range tableNames {
+		regions := s.tableList[tableName]
+		regions = strings.Replace(regions, region+";", "", 1)
+		s.tableList[tableName] = regions
+	}
+	return nil
+}
+
 //HandleRegionQuit 处理某个region由于意外退出
 // name 是region的IP:PORT
 func (s *ServiceDiscovery) HandleRegionQuit(name string) {
-	lostTables := s.tableList[name]
-	for _, table := range strings.Split(lostTables, ";") {
+
+	lostTables, _ := s.regionToTables(name)
+	err := s.deleteTableNames(lostTables, name)
+	if err != nil {
+		return
+	}
+	// 截取出每一个丢失的table名称
+	for _, table := range lostTables {
 		owndRegionList := s.tableList[table]
 		hasTableRegionStr := strings.Replace(owndRegionList, name+";", "", -1)
 		hasTableRegionList := strings.Split(hasTableRegionStr, ";")
 		// 从拥有丢失表的region中挑一个发给另一个region
 		srcRegion := hasTableRegionList[rand.Intn(len(hasTableRegionList))]
-		targetRegion := domStr(regionSer.sortedRegions[0].regionIP, regionSer.sortedRegions[0].regionPort, true)
+		targetRegion := domStr(s.sortedRegions[0].regionIP, s.sortedRegions[0].regionPort, true)
 		p := Type.Packet{}
 		p.Head = Type.PacketHead{P_Type: Type.UploadRegion, Op_Type: -1, Spare: ""}
 		p.Payload = []byte(table + "," + targetRegion)
-		i, _ := strconv.Atoi(strings.Split(srcRegion, ":")[1])
-		address := net.TCPAddr{
-			IP:   net.ParseIP(strings.Split(srcRegion, ":")[0]),
-			Port: i,
-		}
-		conn, err := net.DialTCP("tcp4", nil, &address)
+		//i, _ := strconv.Atoi(strings.Split(srcRegion, ":")[1])
+		//address := net.TCPAddr{
+		//	IP:   net.ParseIP(strings.Split(srcRegion, ":")[0]),
+		//	Port: i,
+		//}
+		conn, err := net.Dial("tcp", srcRegion)
+
+		//conn, err := net.DialTCP("tcp4", nil, &address)
 		if err != nil {
-			log.Fatal(err) // Println + os.Exit(1)
-			return
-		}
-		var packetBuf = make([]byte, 0)
-		packetBuf, err = p.MarshalMsg(packetBuf)
-		_, err1 := conn.Write(packetBuf)
-		if err1 != nil {
 			log.Println(err)
-			conn.Close()
 			return
 		}
-		conn.Close()
+
+		wt := msgp.NewWriter(conn)
+		err = p.EncodeMsg(wt)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		err = conn.Close()
+		if err != nil {
+			log.Println(err)
+			return
+		}
 
 	}
 }
