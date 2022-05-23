@@ -9,7 +9,6 @@ import (
 	"github.com/tinylib/msgp/msgp"
 	"log"
 	"net"
-	"strconv"
 	"strings"
 )
 
@@ -100,14 +99,20 @@ func findTargetRegion(IPList string) (IP string, Port string) {
 	return
 }
 
-func ConnectToRegion(regionIP string, regionPort int, packet Type.Packet) (recPacket Type.Packet) {
+func ConnectToRegion(regionIP string, regionPort string, packet Type.Packet) (recPacket Type.Packet) {
 	// 找到负载最低的region并连接它
-	address := net.TCPAddr{
-		IP:   net.ParseIP(regionIP),
-		Port: regionPort,
-	}
-	conn, err := net.DialTCP("tcp4", nil, &address)
-	// defer conn.Close()
+	//address := net.TCPAddr{
+	//	IP:   net.ParseIP(regionIP),
+	//	Port: regionPort,
+	//}
+	//conn, err := net.DialTCP("tcp4", nil, &address)
+	conn, err := net.Dial("tcp", domStr(regionIP, regionPort, false))
+	defer func(conn net.Conn) {
+		err := conn.Close()
+		if err != nil {
+			log.Println("Error when closing connection:", err)
+		}
+	}(conn)
 	if err != nil {
 		log.Fatal(err) // Println + os.Exit(1)
 		return
@@ -116,7 +121,7 @@ func ConnectToRegion(regionIP string, regionPort int, packet Type.Packet) (recPa
 	wt := msgp.NewWriter(conn)
 	err = packet.EncodeMsg(wt)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
 	//fmt.Printf("packet.Head.P_Type:%d\n", packet.Head.P_Type)
@@ -127,7 +132,6 @@ func ConnectToRegion(regionIP string, regionPort int, packet Type.Packet) (recPa
 
 	// 获取region的返回包
 	err = recPacket.DecodeMsg(rd)
-	conn.Close()
 
 	return
 
@@ -136,14 +140,14 @@ func ConnectToRegion(regionIP string, regionPort int, packet Type.Packet) (recPa
 func SendToRegions(IPList string, packet Type.Packet) (recPacket Type.Packet) {
 	regions := strings.Split(IPList, ";")
 	finalStatus := true
-	finalResult := []byte{}
+	var finalResult []byte
 	for _, region := range regions {
 		IP, Port := strings.Split(region, ":")[0], strings.Split(region, ":")[1]
-		p_int, err := strconv.Atoi(Port)
-		if err != nil {
-			return
-		}
-		recvPkt := ConnectToRegion(IP, p_int, packet)
+		//p_int, err := strconv.Atoi(Port)
+		//if err != nil {
+		//	return
+		//}
+		recvPkt := ConnectToRegion(IP, Port, packet)
 		finalStatus = recvPkt.Signal
 		finalResult = recvPkt.Payload
 		if finalStatus == false {
