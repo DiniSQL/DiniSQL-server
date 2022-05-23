@@ -219,6 +219,13 @@ func (server *RegionServer) serve(conn net.Conn) {
 			}
 			fmt.Println(opRes)
 		}
+		op := "select * from " + p.Head.Spare + ";"
+		err = parser.Parse(strings.NewReader(op), StatementChannel)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Println(<-FinishChannel)
+		FlushChannel <- struct{}{} //开始刷新cache
 	} else if p.Head.P_Type == RegionTransfer {
 		DownloadTransfer(p)
 	}
