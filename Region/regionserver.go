@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 	"unsafe"
@@ -178,7 +179,7 @@ func (server *RegionServer) serve(conn net.Conn) {
 			fmt.Println(err)
 		}
 		replyPacket := Packet{
-			Head:    PacketHead{P_Type: Result, Op_Type: -1},
+			Head:    PacketHead{P_Type: Result, Op_Type: 0},
 			Signal:  opRes[0] == '1',
 			Payload: []byte(opRes[1:]),
 		}
@@ -277,6 +278,15 @@ func Upload(table string, to string) (opRes string, err error) {
 		return
 	}
 
+	sysType := runtime.GOOS
+
+	var sep string
+	if sysType == "windows" {
+		sep = "\\"
+	} else {
+		sep = "/"
+	}
+
 	for i := range matches {
 		fmt.Println(matches[i])
 		file, err := os.Open(matches[i])
@@ -291,7 +301,7 @@ func Upload(table string, to string) (opRes string, err error) {
 			Head: PacketHead{
 				P_Type:  RegionTransfer,
 				Op_Type: i,
-				Spare:   strings.Split(matches[i], "\\")[2],
+				Spare:   strings.Split(matches[i], sep)[2],
 			},
 			Payload: content,
 		}
