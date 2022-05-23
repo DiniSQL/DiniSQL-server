@@ -6,10 +6,11 @@ import (
 	Type "DiniSQL/Region"
 	"context"
 	"fmt"
-	"github.com/tinylib/msgp/msgp"
 	"log"
 	"net"
 	"strings"
+
+	"github.com/tinylib/msgp/msgp"
 )
 
 type RegionStatus struct {
@@ -107,12 +108,12 @@ func ConnectToRegion(regionIP string, regionPort string, packet Type.Packet) (re
 	//}
 	//conn, err := net.DialTCP("tcp4", nil, &address)
 	conn, err := net.Dial("tcp", domStr(regionIP, regionPort, false))
-	defer func(conn net.Conn) {
-		err := conn.Close()
-		if err != nil {
-			log.Println("Error when closing connection:", err)
-		}
-	}(conn)
+	// defer func(conn net.Conn) {
+	// 	err := conn.Close()
+	// 	if err != nil {
+	// 		log.Println("Error when closing connection:", err)
+	// 	}
+	// }(conn)
 	if err != nil {
 		log.Fatal(err) // Println + os.Exit(1)
 		return
@@ -132,6 +133,9 @@ func ConnectToRegion(regionIP string, regionPort string, packet Type.Packet) (re
 
 	// 获取region的返回包
 	err = recPacket.DecodeMsg(rd)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	return
 
@@ -150,7 +154,7 @@ func SendToRegions(IPList string, packet Type.Packet) (recPacket Type.Packet) {
 		recvPkt := ConnectToRegion(IP, Port, packet)
 		finalStatus = recvPkt.Signal
 		finalResult = recvPkt.Payload
-		if finalStatus == false {
+		if !finalStatus {
 			break
 		}
 	}
@@ -264,24 +268,20 @@ func CreatePacket(statement types.DStatements, tables []string, SQLContent strin
 	return packetToClient
 }
 
-func HandleClient(ClientIP string, ClientPort int) (receivedPacket Type.Packet) {
-	fmt.Println("listening...")
-	listener, err := net.Listen("tcp", MASTER_PORT)
-	defer listener.Close()
-	if err != nil {
-		log.Fatal(err) // Println + os.Exit(1)
-	}
-
+func HandleClient(ClientIP string, ClientPort int, listener net.Listener) (receivedPacket Type.Packet) {
 	conn, err := listener.Accept()
-	defer conn.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer conn.Close()
 	fmt.Println("remote connected! address:", conn.RemoteAddr())
 	rd := msgp.NewReader(conn)
 	wt := msgp.NewWriter(conn)
 
 	err = receivedPacket.DecodeMsg(rd)
+	if err != nil {
+		log.Fatal(err)
+	}
 	//res, err1 := ioutil.ReadAll(conn)
 	//if err1 != nil {
 	//	log.Println(err)
@@ -298,7 +298,6 @@ func HandleClient(ClientIP string, ClientPort int) (receivedPacket Type.Packet) 
 	fmt.Printf("p.Head.Op_Type:%d\n", receivedPacket.Head.Op_Type)
 	fmt.Printf("p.Payload:%s\n", receivedPacket.Payload)
 	SQLContent := string(receivedPacket.Payload)
-	go Parse2Statement(StatementChannel, FinishChannel, TablesChannel, OutputStatementChannel)
 
 	err = parser.Parse(strings.NewReader(string(receivedPacket.Payload)), StatementChannel) //收到客户端传过来的语句
 	if err != nil {
@@ -349,9 +348,18 @@ func main() {
 	//close(StatementChannel) //关闭StatementChannel，进而关闭FinishChannel
 	//fmt.Println(<-OutputStatementChannel, <-TablesChannel)
 
+	go Parse2Statement(StatementChannel, FinishChannel, TablesChannel, OutputStatementChannel)
+
+	fmt.Println("listening...")
+	listener, err := net.Listen("tcp", MASTER_PORT)
+	if err != nil {
+		panic(err)
+	}
+	defer listener.Close()
+
 	for {
 		//fmt.Println(<-OutputStatementChannel, <-TablesChannel)
-		client := HandleClient(ClientIP, ClientPort)
+		client := HandleClient(ClientIP, ClientPort, listener)
 		fmt.Println(client)
 	}
 	//for _ = range FinishChannel {
