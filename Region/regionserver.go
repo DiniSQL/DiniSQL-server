@@ -249,6 +249,7 @@ func ExecuteSQLOperation(server *RegionServer, statement string, t types.Operati
 }
 
 func Upload(table string, to string) (opRes string, err error) {
+	MiniSQL.FlushALl()
 	catalog := CatalogManager.GetTableCatalogUnsafe(table)
 	catalogBuf := make([]byte, 0)
 	catalogBuf, err = catalog.MarshalMsg(catalogBuf)
@@ -309,7 +310,6 @@ func Upload(table string, to string) (opRes string, err error) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		time.Sleep(3 * time.Second)
 	}
 	opRes = "Upload Success"
 	return
