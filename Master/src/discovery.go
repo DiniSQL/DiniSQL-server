@@ -26,9 +26,9 @@ type ServiceDiscovery struct {
 	lock          sync.Mutex
 }
 
-//var endpoints = []string{"localhost:2379"}
+var endpoints = []string{"localhost:2379"}
 
-var endpoints = []string{"192.168.84.244:2379"}
+//var endpoints = []string{"192.168.84.244:2379"}
 var regionSer *ServiceDiscovery = NewServiceDiscovery(endpoints) // 每个region的IP:PORT和它对应的访问次数
 //var tableSer *ServiceDiscovery = NewServiceDiscovery(endpoints)  // 每个table的拥有对应table的region们地址
 
@@ -203,6 +203,7 @@ func (s *ServiceDiscovery) HandleUpdate(regionSer *ServiceDiscovery, tableSer *S
 }
 
 func masterDiscovery() {
+	fmt.Println("[ masterDiscovery ]: ", "start")
 	//regionSer := NewServiceDiscovery(endpoints) // 每个region的IP:PORT和它对应的访问次数
 	regionSer.WatchService("/region/")
 	//tableSer := NewServiceDiscovery(endpoints) // 每个table的拥有对应table的region们地址

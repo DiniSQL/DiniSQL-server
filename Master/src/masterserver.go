@@ -114,7 +114,10 @@ func ConnectToRegion(regionIP string, regionPort int, packet Type.Packet) (recPa
 	}
 	rd := msgp.NewReader(conn)
 	wt := msgp.NewWriter(conn)
-	packet.EncodeMsg(wt)
+	err = packet.EncodeMsg(wt)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	//fmt.Printf("packet.Head.P_Type:%d\n", packet.Head.P_Type)
 	//fmt.Printf("packet.Head.Op_Type:%d\n", packet.Head.Op_Type)
@@ -222,6 +225,7 @@ func CreatePacket(statement types.DStatements, tables []string, SQLContent strin
 		//IPResult = regionList(relaxRegions)
 		//tab2reg[tables[0]] = relaxRegions
 		regionSer.tableList[tables[0]] = relaxRegions
+		recvResult = SendToRegions(IPResult, packetToRegion)
 		regionSer.cli.Put(context.Background(), "/table/"+tables[0], IPResult)
 
 	case types.CreateIndex:
@@ -333,10 +337,10 @@ func main() {
 	//if err != nil {
 	//	log.Fatal(err)
 	//}
-	//go masterDiscovery()
-	regionSer.serverList["127.0.0.1:1234"] = 0
-	regionSer.serverList["127.0.0.2:1234"] = 1
-	regionSer.serverList["127.0.0.3:1234"] = 0
+	go masterDiscovery()
+	//regionSer.serverList["127.0.0.1:1234"] = 0
+	//regionSer.serverList["127.0.0.2:1234"] = 1
+	//regionSer.serverList["127.0.0.3:1234"] = 0
 	//CreatePacket(<-OutputStatementChannel, <-TablesChannel, sql_strings[0])
 	//close(StatementChannel) //关闭StatementChannel，进而关闭FinishChannel
 	//fmt.Println(<-OutputStatementChannel, <-TablesChannel)
