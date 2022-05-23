@@ -200,6 +200,7 @@ func (server *RegionServer) serve(conn net.Conn) {
 	} else if p.Head.P_Type == RegionTransferPrepare {
 		opRes, num, err := PrepareForTransfer(server, p)
 		fmt.Println(opRes)
+		tableName := p.Head.Spare
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -219,7 +220,7 @@ func (server *RegionServer) serve(conn net.Conn) {
 			}
 			fmt.Println(opRes)
 		}
-		op := "select * from " + p.Head.Spare + ";"
+		op := "select * from " + tableName + ";"
 		err = parser.Parse(strings.NewReader(op), StatementChannel)
 		if err != nil {
 			fmt.Println(err)
