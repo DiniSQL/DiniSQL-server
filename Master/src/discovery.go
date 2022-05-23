@@ -4,7 +4,6 @@ import (
 	Type "DiniSQL/Region"
 	"context"
 	"fmt"
-	"github.com/tinylib/msgp/msgp"
 	"log"
 	"math/rand"
 	"net"
@@ -151,8 +150,45 @@ func (s *ServiceDiscovery) deleteTableNames(tableNames []string, region string) 
 		regions := s.tableList[tableName]
 		regions = strings.Replace(regions, region+";", "", 1)
 		s.tableList[tableName] = regions
+		s.cli.Put(context.Background(), "/table/"+tableName, regions)
 	}
 	return nil
+}
+
+func (s *ServiceDiscovery) inExclude(exclude string, region string) bool {
+	excludeRegions := strings.Split(exclude, ";")
+	excludeRegions = excludeRegions[:len(excludeRegions)-1]
+	for _, excludeRegion := range excludeRegions {
+		if excludeRegion == region {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *ServiceDiscovery) findAndDelTargetRegionFromSorted(name string, excluded string) string {
+	idx := -1
+	for i, r := range s.sortedRegions {
+		if domStr(r.regionIP, r.regionPort, false) == name {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		log.Println("[ ????? ] findAndDelTargetRegionFromSorted: ", name, " not found in sortedRegions")
+	} else {
+		s.sortedRegions = append(s.sortedRegions[:idx], s.sortedRegions[idx+1:]...)
+	}
+	for _, region := range s.sortedRegions {
+		if s.inExclude(excluded, domStr(region.regionIP, region.regionPort, false)) {
+			continue
+		}
+		return domStr(region.regionIP, region.regionPort, false)
+		//if domStr(region.regionIP, region.regionPort, false) != excluded {
+		//	return domStr(region.regionIP, region.regionPort, false)
+		//}
+	}
+	return ""
 }
 
 //HandleRegionQuit 处理某个region由于意外退出
@@ -161,6 +197,7 @@ func (s *ServiceDiscovery) HandleRegionQuit(name string) {
 
 	lostTables, _ := s.regionToTables(name)
 	err := s.deleteTableNames(lostTables, name)
+	delete(s.serverList, name)
 	if err != nil {
 		return
 	}
@@ -169,11 +206,20 @@ func (s *ServiceDiscovery) HandleRegionQuit(name string) {
 		owndRegionList := s.tableList[table]
 		hasTableRegionStr := strings.Replace(owndRegionList, name+";", "", -1)
 		hasTableRegionList := strings.Split(hasTableRegionStr, ";")
+		hasTableRegionList = hasTableRegionList[:len(hasTableRegionList)-1]
 		// 从拥有丢失表的region中挑一个发给另一个region
+		if len(hasTableRegionList) == 0 {
+			log.Println("[ WARNING ]: ", "stop copying table:", table, " 没有可用的region")
+			continue
+		}
 		srcRegion := hasTableRegionList[rand.Intn(len(hasTableRegionList))]
-		targetRegion := domStr(s.sortedRegions[0].regionIP, s.sortedRegions[0].regionPort, true)
+		targetRegion := s.findAndDelTargetRegionFromSorted(name, s.tableList[table])
+		s.tableList[table] = s.tableList[table] + targetRegion + ";"
+		s.cli.Put(context.Background(), "/table/"+table, s.tableList[table])
+		//targetRegion := domStr(s.sortedRegions[0].regionIP, s.sortedRegions[0].regionPort, true)
 		p := Type.Packet{}
-		p.Head = Type.PacketHead{P_Type: Type.UploadRegion, Op_Type: -1, Spare: ""}
+		p.Head = Type.PacketHead{P_Type: Type.UploadRegion, Op_Type: 0, Spare: ""}
+
 		p.Payload = []byte(table + "," + targetRegion)
 		//i, _ := strconv.Atoi(strings.Split(srcRegion, ":")[1])
 		//address := net.TCPAddr{
@@ -188,8 +234,12 @@ func (s *ServiceDiscovery) HandleRegionQuit(name string) {
 			return
 		}
 
-		wt := msgp.NewWriter(conn)
-		err = p.EncodeMsg(wt)
+		var packetBuf = make([]byte, 0)
+		packetBuf, err = p.MarshalMsg(packetBuf)
+		_, err = conn.Write(packetBuf)
+		//err = packet.EncodeMsg(wt)
+		//wt := msgp.NewWriter(conn)
+		//err = p.EncodeMsg(wt)
 		if err != nil {
 			log.Println(err)
 			return
