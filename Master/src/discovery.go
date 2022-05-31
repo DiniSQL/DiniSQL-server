@@ -287,7 +287,6 @@ func (s *ServiceDiscovery) HandleUpdate(regionSer *ServiceDiscovery, tableSer *S
 }
 
 func masterDiscovery() {
-	fmt.Println("[ masterDiscovery ]: ", "start")
 	//regionSer := NewServiceDiscovery(endpoints) // 每个region的IP:PORT和它对应的访问次数
 	regionSer.WatchService("/region/")
 	//tableSer := NewServiceDiscovery(endpoints) // 每个table的拥有对应table的region们地址
@@ -297,7 +296,7 @@ func masterDiscovery() {
 	//regionSer.WatchService("/gRPC/")
 	for {
 		select {
-		case <-time.Tick(5 * time.Second):
+		case <-time.Tick(2 * time.Second):
 			regionSer.regionCnt = len(regionSer.serverList)
 			log.Println("Region count: ", regionSer.regionCnt)
 			log.Println(regionSer.GetServices())
