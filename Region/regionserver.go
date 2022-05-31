@@ -227,6 +227,7 @@ func (server *RegionServer) serve(conn net.Conn) {
 		}
 		fmt.Println(<-FinishChannel)
 		FlushChannel <- struct{}{} //开始刷新cache
+		MiniSQL.InitDB()
 	} else if p.Head.P_Type == RegionTransfer {
 		DownloadTransfer(p)
 	}
@@ -257,24 +258,7 @@ func ExecuteSQLOperation(server *RegionServer, statement string, t types.Operati
 }
 
 func Upload(table string, to string) (opRes string, err error) {
-	op := "quit;"
-	err = parser.Parse(strings.NewReader(op), StatementChannel)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(<-FinishChannel)
-	FlushChannel <- struct{}{} //开始刷新cache
-
-	MiniSQL.InitDB()
-
-	op = "use database " + databaseName + ";"
-	err = parser.Parse(strings.NewReader(op), StatementChannel)
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(<-FinishChannel)
-	FlushChannel <- struct{}{} //开始刷新cache
-
+	MiniSQL.FlushALl()
 	catalog := CatalogManager.GetTableCatalogUnsafe(table)
 	catalogBuf := make([]byte, 0)
 	catalogBuf, err = catalog.MarshalMsg(catalogBuf)
