@@ -240,7 +240,7 @@ func ExecuteSQLOperation(server *RegionServer, statement string, t types.Operati
 	}
 	opRes = <-FinishChannel
 	FlushChannel <- struct{}{} //开始刷新cache
-	fmt.Println(opRes)
+	fmt.Println(opRes[1:])
 
 	if t == types.CreateTable {
 		new_table := strings.Split(opRes, " ")[1]
