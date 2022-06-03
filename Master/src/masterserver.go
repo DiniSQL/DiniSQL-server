@@ -302,17 +302,16 @@ func CreatePacket(statement types.DStatements, tables []string, SQLContent strin
 	return packetToClient
 }
 
-func HandleClient(ClientIP string, ClientPort int, listener net.Listener) (receivedPacket Type.Packet) {
-	conn, err := listener.Accept()
-	if err != nil {
-		log.Fatal(err)
-	}
+func HandleClient(conn net.Conn) (receivedPacket Type.Packet) {
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 	defer conn.Close()
 	fmt.Println("remote connected! address:", conn.RemoteAddr())
 	rd := msgp.NewReader(conn)
 	//wt := msgp.NewWriter(conn)
 
-	err = receivedPacket.DecodeMsg(rd)
+	err := receivedPacket.DecodeMsg(rd)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -393,18 +392,19 @@ func main() {
 	//fmt.Println(<-OutputStatementChannel, <-TablesChannel)
 
 	go Parse2Statement(StatementChannel, FinishChannel, TablesChannel, OutputStatementChannel)
-
-	fmt.Println("listening...")
 	listener, err := net.Listen("tcp", MASTER_PORT)
-	if err != nil {
-		panic(err)
-	}
-	defer listener.Close()
 
 	for {
-		//fmt.Println(<-OutputStatementChannel, <-TablesChannel)
-		client := HandleClient(ClientIP, ClientPort, listener)
-		fmt.Println(client)
+		fmt.Println("listening...")
+		if err != nil {
+			panic(err)
+		}
+		defer listener.Close()
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Fatal(err)
+		}
+		go HandleClient(conn)
 	}
 	//for _ = range FinishChannel {
 	//

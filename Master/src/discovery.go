@@ -214,6 +214,7 @@ func (s *ServiceDiscovery) HandleRegionQuit(name string) {
 		}
 		srcRegion := hasTableRegionList[rand.Intn(len(hasTableRegionList))]
 		targetRegion := s.findAndDelTargetRegionFromSorted(name, s.tableList[table])
+		fmt.Println("[ WARNING ]: ", "copying table:", table, " from:", srcRegion, " to:", targetRegion)
 		s.tableList[table] = s.tableList[table] + targetRegion + ";"
 		s.cli.Put(context.Background(), "/table/"+table, s.tableList[table])
 		//targetRegion := domStr(s.sortedRegions[0].regionIP, s.sortedRegions[0].regionPort, true)
